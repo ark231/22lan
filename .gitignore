@@ -1,0 +1,6 @@
+test/
+*.nlib
+*.no
+*.cpp
+*.nyu
+!22lan_lib.nyu

@@ -1,0 +1,8 @@
+INSTRUCTION.-1: /[a-z0-9_]+/
+COMMENT: /;.*/
+BASE32:/[A-Z0-9]+/
+
+line:(INSTRUCTION|BASE32)? COMMENT? 
+start: (line"\n")+
+
+%ignore " "
