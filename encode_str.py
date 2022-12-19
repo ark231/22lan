@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import base64
 import sys
+import re
 
 
 def encode(src: str) -> bytes:
@@ -8,7 +9,7 @@ def encode(src: str) -> bytes:
 
 
 def main():
-    print(encode(sys.argv[1]))
+    print(encode(re.sub(r"(?<!\\)\\n", "\n", sys.argv[1])))
 
 
 if __name__ == "__main__":
