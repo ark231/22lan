@@ -125,8 +125,12 @@ NyulanGenerator{{
             if instruction == "nand":
                 self.functions[-1].add_step("r0 &= r1;")
                 self.functions[-1].add_step("r0 = !r0;")
-            elif "shift" in instruction:
-                self.functions[-1].add_step("r0 <<= (r1 & 0xff);")
+            elif instruction == "lshift":
+                self.functions[-1].add_step("if(r1 & 0xff >= 0){")
+                self.functions[-1].add_step("    r0 <<= (r1 & 0xff);")
+                self.functions[-1].add_step("}else{")
+                self.functions[-1].add_step("    r0 >>= -static_cast<std::int8_t>(r1 & 0xff);")
+                self.functions[-1].add_step("}")
             elif instruction == "push8s0":
                 self.functions[-1].add_step("s0.push(r0 & 0xff)")
             elif instruction == "pop8s0":
@@ -139,6 +143,12 @@ NyulanGenerator{{
                 self.functions[-1].add_step("r1 ^= (r1 & 0xff);")
                 self.functions[-1].add_step("r1 |= s1.top();")
                 self.functions[-1].add_step("s1.pop();")
+            elif instruction == "push8s2":
+                self.functions[-1].add_step("s2.push(r2 & 0xff)")
+            elif instruction == "pop8s2":
+                self.functions[-1].add_step("r2 ^= (r2 & 0xff);")
+                self.functions[-1].add_step("r2 |= s2.top();")
+                self.functions[-1].add_step("s2.pop();")
             elif instruction == "call":
                 self.functions[-1].add_step("ftable[r0]();")
             elif instruction == "ret":
@@ -172,8 +182,10 @@ NyulanGenerator{{
                 self.functions[-1].add_step("}")
             elif instruction == "pushl8":
                 self.functions[-1].add_step(f"s0.push({self.compile_time_stack.pop8()});")
-            elif instruction == "xchg":
+            elif instruction == "xchg01":
                 self.functions[-1].add_step("std::swap(r0,r1);")
+            elif instruction == "xchg12":
+                self.functions[-1].add_step("std::swap(r1,r2);")
             else:
                 raise ParseError(f"invalid instruction {instruction}", meta.line)
 
@@ -185,6 +197,7 @@ NyulanGenerator{{
             lan22_initializer.add_step(f"s1.push({byte});")
         lan22_initializer.add_step("r0 = 0;")
         lan22_initializer.add_step("r1 = 0;")
+        lan22_initializer.add_step("r2 = 0;")
         self.functions.append(lan22_initializer)
 
         entrypoint = Function("main", "int")
@@ -203,8 +216,8 @@ NyulanGenerator{{
 #include<stack>
 #include<functional>
 
-std::uint64_t r0,r1;
-std::stack<std::uint8_t> s0,s1;
+std::uint64_t r0,r1,r2;
+std::stack<std::uint8_t> s0,s1,s2;
 std::unordered_map<std::uint64_t,std::function<void(void)>> ftable;
         """.strip(
             "\n"
