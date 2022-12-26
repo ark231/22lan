@@ -1,0 +1,20 @@
+FUNC_ID: /0b[01]+/
+FUNC_NAME.-1: /[a-zA-Z0-9_]+/
+TYPE: /[rs][0123]_[0-9]+/
+REGISTER.1: /r[0123]/
+CONST: "const"
+INVALIDATED: "invalidated"
+NONE: "none"
+
+register_status: CONST|INVALIDATED
+
+type_list: (TYPE|NONE) ("," (TYPE|NONE))* 
+
+deffunc: "func" FUNC_ID
+funcinfo: FUNC_NAME type_list "->" type_list
+register_info: REGISTER ":" register_status 
+register_info_list: register_info ("," register_info)*
+
+start: ";"(("@"(deffunc|funcinfo|register_info_list))|/[^@]+/)?
+
+%ignore " "

@@ -8,6 +8,7 @@ import base64
 import sys
 from pathlib import Path
 import re
+from . import base
 
 
 class Label:
@@ -17,12 +18,6 @@ class Label:
 
     def __str__(self) -> str:
         return f"{self.name}:"
-
-
-class ParseError(Exception):
-    def __init__(self, message: str, linenum: int):
-        super().__init__(message)
-        self.linenum = linenum
 
 
 GOTO = "__GOTO__"
@@ -90,7 +85,7 @@ class Stack:
         return result
 
 
-class CPlusPlusGenerator(Transformer):
+class CPlusPlusGenerator(base.BasicGenerator):
     initial_s1: list[int]
     compile_time_stack: Stack
     functions: list[Function]
@@ -200,7 +195,7 @@ CPlusPlusGenerator{{
             elif instruction == "xchg23":
                 self.functions[-1].add_step("std::swap(r2,r3);")
             else:
-                raise ParseError(f"invalid instruction {instruction}", meta.line)
+                raise base.ParseError(f"invalid instruction {instruction}", meta.line)
 
     def start(self, _):
         lan22_initializer = Function("init")
@@ -250,12 +245,6 @@ std::unordered_map<std::uint64_t,std::function<void(void)>> ftable;
         return result
 
 
-def parse(source: str) -> Tree:
-    with open(Path(__file__).parent / "22lan.lark", "r", encoding="utf8") as larkfile:
-        parser = Lark(larkfile.read(), propagate_positions=True)
-    return parser.parse(source)
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(description="convert 22lan source code to nyulan assembly", prog="22lan_cxx.py")
     parser.add_argument("-s", "--source", help="source file", required=True)
@@ -263,15 +252,15 @@ def main() -> None:
     parser.add_argument("-d", "--debug", action="store_true", help="enable debug output")
     args = parser.parse_args()
 
-    if args.output == None:
+    if args.output is None:
         args.output = Path(args.source).with_suffix(".cpp")
 
     with open(args.source, "r", encoding="utf8") as sourcefile:
-        parsed_data = parse(sourcefile.read())
+        parsed_data = base.Lan22Parser.parse(sourcefile.read())
     generator = CPlusPlusGenerator()
     try:
         generator.from_tree(parsed_data)
-    except ParseError as e:
+    except base.ParseError as e:
         print(sys.stderr, f"parse error at {args.source}:{e.linenum} info:{e}")
 
     if args.debug:
