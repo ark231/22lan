@@ -12,9 +12,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="convert 22lan source code to specified language", prog="22lan.py")
     parser.add_argument("-s", "--source", help="source file", required=True)
     parser.add_argument("-o", "--output", help="output filename (in result folder)")
-    parser.add_argument(
-        "-l", "--lang", help="output language", choices=["nyulan", "cxx", "annotation"], default="nyulan"
-    )
+    parser.add_argument("-l", "--lang", help="output language", choices=SUFFIXES.keys(), default="nyulan")
     parser.add_argument("-d", "--debug", action="store_true", help="enable debug output")
     args = parser.parse_args()
 

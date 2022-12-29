@@ -85,7 +85,7 @@ class Stack:
         return result
 
 
-class CPlusPlusGenerator(base.BasicGenerator):
+class CPlusPlusGenerator(base.BasicGenerator[base.Lan22Tree]):
     initial_s1: list[int]
     compile_time_stack: Stack
     functions: list[Function]

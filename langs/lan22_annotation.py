@@ -1,60 +1,59 @@
 #!/usr/bin/env python3
 
 from lark.visitors import Discard, v_args
+from lark.tree import Tree
 from lark.lexer import Token
 from pathlib import Path
 import csv
 from . import base
 import io
-from typing import cast
+from typing import cast, TypedDict, NewType
 
 
-class AnnotationRetriever(base.BasicGenerator):
+class FuncInfo(TypedDict):
+    name: str
+    id: str
+    args: list[str]
+    retvals: list[str]
+
+
+AnnotationTree = NewType("AnnotationTree", Tree)
+
+
+class AnnotationRetriever(base.BasicGenerator[AnnotationTree]):
     def __init__(self):
         super().__init__()
-        self.funcs: list[dict[str, str | list[str]]] = []
-
-    def FUNC_ID(self, node: str) -> str:
-        return node
-
-    def FUNC_NAME(self, node: str) -> str:
-        return node
-
-    def TYPE(self, node: str) -> str:
-        return node
+        self.funcs: list[FuncInfo] = []
 
     def type_list(self, nodes: list[Token]) -> list[str]:
         return [] if nodes[0].type == "NONE" else [node.value for node in nodes]
 
-    def deffunc(self, nodes: list):
-        self.funcs.append({"id": nodes[0]})
+    def deffunc(self, nodes: list[Token]):
+        self.funcs.append({"name": "", "id": nodes[0].value, "args": [], "retvals": []})
         return Discard
 
-    def funcinfo(self, nodes: list[str | list[str]]):
-        self.funcs[-1]["name"] = nodes[0]
-        self.funcs[-1]["args"] = nodes[1]
-        self.funcs[-1]["retvals"] = nodes[2]
+    def funcinfo(self, nodes: list[Token | list[str]]):
+        self.funcs[-1]["name"] = cast(Token, nodes[0]).value
+        self.funcs[-1]["args"] = cast(list[str], nodes[1])
+        self.funcs[-1]["retvals"] = cast(list[str], nodes[2])
         return Discard
 
 
-class FuncInfoTableGenerator(base.BasicGenerator):
+class FuncInfoTableGenerator(base.BasicGenerator[base.Lan22Tree]):
     def __init__(self):
         super().__init__()
         self.retriever = AnnotationRetriever()
 
     @v_args(meta=True)
-    def line(self, meta, nodes: list[Token]):
-        comment_node = None
+    def start(self, meta, nodes: list[Token | base.Lan22Tree]):
         for node in nodes:
+            if not isinstance(node, Token):
+                continue
             if node.type == "COMMENT":
-                comment_node = node.value
-        if comment_node is None:
-            return Discard
-        try:
-            self.retriever.from_tree(AnnotationParser.parse(comment_node))
-        except Exception as err:
-            raise base.ParseError(str(err), meta.line)
-        return Discard
+                try:
+                    self.retriever.from_tree(AnnotationParser.parse(node.value))
+                except Exception as err:
+                    raise base.ParseError(str(err), meta.line)
 
     def dumps(self) -> str:
         result = ""
@@ -78,6 +77,10 @@ class FuncInfoTableGenerator(base.BasicGenerator):
             result = stream.getvalue()
         return result
 
+    @property
+    def retrieved_funcs(self) -> list[FuncInfo]:
+        return self.retriever.funcs
 
-class AnnotationParser(base.BasicParser):
+
+class AnnotationParser(base.BasicParser[AnnotationTree]):
     larkfile = Path(__file__).parent / "annotation.lark"

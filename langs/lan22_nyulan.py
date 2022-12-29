@@ -123,7 +123,7 @@ class Stack:
         return result
 
 
-class NyulanGenerator(base.BasicGenerator):
+class NyulanGenerator(base.BasicGenerator[base.Lan22Tree]):
     initial_s1: list[int]
     compile_time_stack: Stack
     functions: list[Function]

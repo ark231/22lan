@@ -15,6 +15,6 @@ funcinfo: FUNC_NAME type_list "->" type_list
 register_info: REGISTER ":" register_status 
 register_info_list: register_info ("," register_info)*
 
-start: ";"(("@"(deffunc|funcinfo|register_info_list))|/[^@]+/)?
+start: ";"(("\\"(deffunc|funcinfo|register_info_list))|/ *[^\\].*/)?
 
 %ignore " "

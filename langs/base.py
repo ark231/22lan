@@ -4,6 +4,7 @@ from lark.visitors import Transformer
 from lark.tree import Tree
 from lark.lark import Lark
 from pathlib import Path
+from typing import NewType, ClassVar, TypeVar, Generic, cast
 
 
 class ParseError(Exception):
@@ -12,11 +13,14 @@ class ParseError(Exception):
         self.linenum = linenum
 
 
-class BasicGenerator(Transformer):
+ParseResult = TypeVar("ParseResult", bound=Tree)
+
+
+class BasicGenerator(Transformer, Generic[ParseResult]):
     def __init__(self):
         super().__init__()
 
-    def from_tree(self, tree: Tree) -> None:
+    def from_tree(self, tree: ParseResult) -> None:
         super().transform(tree)
 
     def dump(self, outputfile) -> None:
@@ -26,15 +30,18 @@ class BasicGenerator(Transformer):
         return ""
 
 
-class BasicParser:
-    larkfile: Path = Path()
+class BasicParser(Generic[ParseResult]):
+    larkfile: ClassVar[Path] = Path()
 
     @classmethod
-    def parse(cls, source: str) -> Tree:
+    def parse(cls, source: str) -> ParseResult:
         with open(cls.larkfile, "r", encoding="utf8") as larkfile:
             parser = Lark(larkfile.read(), propagate_positions=True)
-        return parser.parse(source)
+        return cast(ParseResult, parser.parse(source))
 
 
-class Lan22Parser(BasicParser):
+Lan22Tree = NewType("Lan22Tree", Tree)
+
+
+class Lan22Parser(BasicParser[Lan22Tree]):
     larkfile = Path(__file__).parent / "22lan.lark"
