@@ -102,59 +102,20 @@ class Function:
         return result
 
 
-class Stack:
-    _value: int
-
-    def __init__(self):
-        self._value = 0
-
-    def push1(self, value: int) -> None:
-        self._value <<= 1
-        self._value |= value
-
-    def pop8(self) -> int:
-        result = self._value & 0b1111_1111
-        self._value >>= 8
-        return result
-
-    def pop64(self) -> int:
-        result = self._value & 0xFFFF_FFFF_FFFF_FFFF
-        self._value >>= 64
-        return result
-
-
-class NyulanGenerator(base.BasicGenerator[base.Lan22Tree]):
-    initial_s1: list[int]
-    compile_time_stack: Stack
+class NyulanGenerator(base.BasicGeneratorFromLan22):
     functions: list[Function]
 
     def __repr__(self):
         return f"""
 NyulanGenerator{{
-    initial_s1_size:{len(self.initial_s1)}
-    initial_s1:{self.initial_s1}
+    initial_s1_size:{len(self.initial_s1_base32)}
+    initial_s1:{self.initial_s1_base32}
 }}
         """
 
     def __init__(self) -> None:
         super().__init__()
-        self.initial_s1 = []
-        self.compile_time_stack = Stack()
         self.functions = []
-
-    def from_tree(self, tree: Tree) -> None:
-        super().transform(tree)
-
-    def number(self, node: list[Token]) -> int:
-        assert len(node) == 1
-        return int(node[0].value, 0)
-
-    def BASE32(self, node: str):
-        self.initial_s1 += base64.b32decode(node + "=" * (8 - len(node) % 8))
-        return Discard
-
-    def COMMENT(self, _: str):
-        return Discard
 
     @v_args(meta=True)
     def line(self, meta, nodes: list):
@@ -266,7 +227,7 @@ NyulanGenerator{{
             lan22_initializer.add_step(OneStep("PUSHL64", [Label(func.name)]))
             lan22_initializer.add_step(OneStep("PUSHR64", [Register(4)]))
             lan22_initializer.add_step(OneStep("CALL", [Register(0)]))
-        for byte in reversed(self.initial_s1):
+        for byte in reversed(base64.b32decode(self.initial_s1_base32 + "=" * (8 - len(self.initial_s1_base32) % 8))):
             lan22_initializer.add_step(OneStep("PUSHR8", [Register(1)]))
             lan22_initializer.add_step(OneStep("PUSHL64", [Literal(byte)]))
             lan22_initializer.add_step(OneStep("POP64", [Register(2)]))
@@ -289,9 +250,6 @@ NyulanGenerator{{
         entrypoint.add_step(OneStep("POP64", [Register(2)]))
         entrypoint.add_step(OneStep("CALL", [Register(2)]))
         return Discard
-
-    def dump(self, outputfile) -> None:
-        outputfile.write(self.dumps())
 
     def dumps(self) -> str:
         result = """
