@@ -20,6 +20,10 @@ class FuncInfo(TypedDict):
 AnnotationTree = NewType("AnnotationTree", Tree)
 
 
+class AnnotationParser(base.BasicParser[AnnotationTree]):
+    larkfile = Path(__file__).parent / "annotation.lark"
+
+
 class AnnotationRetriever(base.BasicGenerator[AnnotationTree]):
     def __init__(self):
         super().__init__()
@@ -40,9 +44,10 @@ class AnnotationRetriever(base.BasicGenerator[AnnotationTree]):
 
 
 class FuncInfoTableGenerator(base.BasicGenerator[base.Lan22Tree]):
-    def __init__(self):
+    def __init__(self, parser: type[base.BasicParser] = AnnotationParser):
         super().__init__()
         self.retriever = AnnotationRetriever()
+        self.parser = parser
 
     @v_args(meta=True)
     def start(self, meta, nodes: list[Token | base.Lan22Tree]):
@@ -51,7 +56,7 @@ class FuncInfoTableGenerator(base.BasicGenerator[base.Lan22Tree]):
                 continue
             if node.type == "COMMENT":
                 try:
-                    self.retriever.from_tree(AnnotationParser.parse(node.value))
+                    self.retriever.from_tree(self.parser.parse(node.value))
                 except Exception as err:
                     raise base.ParseError(str(err), meta.line)
 
@@ -80,7 +85,3 @@ class FuncInfoTableGenerator(base.BasicGenerator[base.Lan22Tree]):
     @property
     def retrieved_funcs(self) -> list[FuncInfo]:
         return self.retriever.funcs
-
-
-class AnnotationParser(base.BasicParser[AnnotationTree]):
-    larkfile = Path(__file__).parent / "annotation.lark"

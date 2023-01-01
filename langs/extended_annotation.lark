@@ -1,0 +1,4 @@
+%import .langs.annotation (FUNC_ID,FUNC_NAME,TYPE,REGISTER,CONST,INVALIDATED,NONE,register_status,type_list,deffunc,funcinfo,register_info,register_info_list,start)
+
+%extend FUNC_ID: /-0b[01]+/
+%ignore " "
