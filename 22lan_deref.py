@@ -12,7 +12,7 @@ from enum import Enum, auto
 from lark.lexer import Token
 import math
 
-SUFFIXES: Final[dict[str, str]] = {"22lan": ".22l", "funcinfo": ".ext.csv"}
+SUFFIXES: Final[dict[str, str]] = {"22lan": ".22l", "funcinfo": ".ext.csv", "22lan_extended": ".22le"}
 
 
 class ExtendedAnnotationParser(lan22_annotation.AnnotationParser):
@@ -175,12 +175,12 @@ class ExtensionResolver:
         self.funcs = funcs
         if any([func["id"] < 0 for func in funcs.values()]):
             self.code = Code()
-            self.resolve_autofuncs()
+            self._resolve_autofuncs()
         else:
             with open(args.source, "r", encoding="utf-8") as infile:
                 self.code = Code(infile.read())
 
-    def resolve_autofuncs(self) -> None:
+    def _resolve_autofuncs(self) -> None:
         if self.args.funcinfo is None:
             print("error: source file contains autofunc, but no funcinfo file was supplied", file=sys.stderr)
             sys.exit(1)
@@ -337,8 +337,108 @@ def emit_22lan(args):
         outfile.write(resolver.code.as_str())
 
 
+class FuncDeclarationSolver:
+    code: Code
+
+    def __init__(self, args, funcs: dict[str, FuncBody]) -> None:
+        self.args = args
+        self.funcs = funcs
+        self.code = Code()
+        self._resolve_funcdeclarations()
+
+    def _resolve_funcdeclarations(self) -> None:
+        if self.args.funcinfo is None:
+            print("error: no funcinfo file was supplied", file=sys.stderr)
+            sys.exit(1)
+        result = Code(self.funcs["!!top!!"]["content"])
+        del self.funcs["!!top!!"]
+        funcnames_in_funcinfo: list[str] = []
+        with open(self.args.funcinfo, "r", encoding="utf-8") as infile:
+            reader = csv.reader(infile)
+            header = next(reader)
+            name_idx = header.index("name")
+            type_idx = header.index("type")
+            id_idx = header.index("id")
+            arg0_idx = header.index("arg0") if "arg0" in header else None
+            retval0_idx = header.index("retval0") if "retval0" in header else None
+            for row in reader:
+                if row == []:
+                    continue
+                try:
+                    func = self.funcs[row[name_idx]]
+                    match row[type_idx]:
+                        case "raw":
+                            result.add_line(rf";\func {int(row[id_idx],0):#b}")
+                        case "std" | "usr":
+                            result.add_line(rf";\autofunc {row[type_idx]}")
+                        case _:
+                            print(f"error: unknown functype '{row[type_idx]}' for func '{row[name_idx]}'")
+                            print(rf"func_id from_annotation: {func['id']}, from funcinfo file: {row[id_idx]}")
+                            sys.exit(1)
+                    result.add_lines(func["content"].splitlines())
+                    funcnames_in_funcinfo.append(row[name_idx])
+                except KeyError:
+                    print(
+                        f"warn: func '{row[name_idx]} is in funcinfo file, but not in source code, thus not implemented'"
+                    )
+                    match row[type_idx]:
+                        case "std" | "usr":
+                            result.add_line(rf";\autofunc {row[type_idx]}")
+                        case "raw":
+                            result.add_line(rf";\func {int(row[id_idx],0):#b}")
+                        case _:
+                            print(f"error: unknown functype '{row[type_idx]}' for func '{row[name_idx]}'")
+                            print(rf"func_id from funcinfo file: {row[id_idx]}")
+                            sys.exit(1)
+                    if arg0_idx is None:
+                        func_args = None
+                    else:
+                        func_args = []
+                        for i in range(arg0_idx, retval0_idx if retval0_idx is not None else len(header)):
+                            if row[i] != "":
+                                func_args.append(row[i])
+                    if retval0_idx is None:
+                        retvals = None
+                    else:
+                        retvals = []
+                        for i in range(retval0_idx, len(header)):
+                            if row[i] != "":
+                                retvals.append(row[i])
+
+                    def stringize_typelist(typelist: list[str] | None) -> str:
+                        return "none" if typelist is None else ", ".join(typelist)
+
+                    result.add_line(
+                        rf";\{row[name_idx]} {stringize_typelist(func_args)} -> {stringize_typelist(retvals)}"
+                    )
+                    result.add_line(";TODO: implement this function")
+            for name in set(self.funcs) - set(funcnames_in_funcinfo):
+                print(f"warn: function '{name}' is in source code, but not in funcinfo file")
+        self.code = result
+
+
+def emit_22lan_extended(args):
+    funcs = split_funcs(args)
+    for name, body in funcs.items():
+        if name == "!!top!!":
+            continue
+        check_result = check_implementation_exists(body)
+        if check_result is None:
+            print(f"warn: mismatching startfunc and endfunc in function '{name}'")
+        elif check_result == False:
+            print(f"warn: function '{name}' doesn't have implementation")
+    resolver = FuncDeclarationSolver(args, funcs)
+
+    with open(args.output, "w", encoding="utf-8") as outfile:
+        outfile.write(resolver.code.as_str())
+
+
 def main():
-    parser = argparse.ArgumentParser(description="resolve 22lan's function reference extention", prog="22lan_deref.py")
+    parser = argparse.ArgumentParser(
+        description="resolve 22lan's function reference extention",
+        prog="22lan_deref.py",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
     parser.add_argument("-s", "--source", help="source file", required=True)
     parser.add_argument("-f", "--funcinfo", help="function information file")
     parser.add_argument("-o", "--output", help="output filename (in result folder)")
@@ -348,12 +448,23 @@ def main():
 
     if args.output is None:
         args.output = Path(args.source).with_suffix(SUFFIXES[args.lang])
+    if Path(args.output) == Path(args.source):
+        print("source and output is the same. are you sure to overwrite the source file?")
+        while True:
+            confirmed = input("y/n> ")
+            match confirmed.lower():
+                case "y":
+                    break
+                case "n":
+                    sys.exit(0)
 
     match args.lang:
         case "22lan":
             emit_22lan(args)
         case "funcinfo":
             emit_funcinfo(args)
+        case "22lan_extended":
+            emit_22lan_extended(args)
 
 
 if __name__ == "__main__":
