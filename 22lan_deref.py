@@ -6,10 +6,11 @@ from pathlib import Path
 import csv
 import re
 from langs import lan22_annotation, base
-from typing import cast, Final, ClassVar, TypedDict, NewType
+from typing import cast, Final, ClassVar, TypedDict, NewType, TypeVar, Generic, Literal
 import io
 from enum import Enum, auto
 from lark.lexer import Token
+import math
 
 SUFFIXES: Final[dict[str, str]] = {"22lan": ".22l", "funcinfo": ".ext.csv"}
 
@@ -138,89 +139,185 @@ def split_funcs(args) -> dict[str, FuncBody]:
     return funcs
 
 
-Lan22WithFuncrefStr = NewType("Lan22WithFuncrefStr", str)
+ExtendedLan22Str = NewType("ExtendedLan22Str", str)
 PureLan22Str = NewType("PureLan22Str", str)
 
 
-def resolve_autofuncs(args, funcs: dict[str, FuncBody]) -> Lan22WithFuncrefStr:
-    if args.funcinfo is None:
-        print("error: source file contains autofunc, but no funcinfo file was supplied", file=sys.stderr)
-        sys.exit(1)
-    result = funcs["!!top!!"]["content"]
-    del funcs["!!top!!"]
-    funcnames_in_funcinfo: list[str] = []
-    with open(args.funcinfo, "r", encoding="utf-8") as infile:
-        reader = csv.reader(infile)
-        header = next(reader)
-        name_idx = header.index("name")
-        type_idx = header.index("type")
-        id_idx = header.index("id")
-        arg0_idx = header.index("arg0") if "arg0" in header else None
-        retval0_idx = header.index("retval0") if "retval0" in header else None
-        for row in reader:
-            if row == []:
+class Code:
+    _code: list[str]
+    _indent: str
+
+    def __init__(self, code=""):
+        self._code = code.splitlines()
+        self._indent = ""
+
+    def add_line(self, line: str) -> None:
+        self._code.append(f"{self._indent}{line}")
+
+    def add_lines(self, lines: list[str]) -> None:
+        self._code += lines
+
+    def as_str(self) -> str:
+        return "\n".join(self._code)
+
+    def set_indent(self, indent: str) -> None:
+        self._indent = indent
+
+    def __getitem__(self, index: int) -> str:
+        return self._code[index]
+
+
+class ExtensionResolver:
+    code: Code
+
+    def __init__(self, args, funcs: dict[str, FuncBody]) -> None:
+        self.args = args
+        self.funcs = funcs
+        if any([func["id"] < 0 for func in funcs.values()]):
+            self.code = Code()
+            self.resolve_autofuncs()
+        else:
+            with open(args.source, "r", encoding="utf-8") as infile:
+                self.code = Code(infile.read())
+
+    def resolve_autofuncs(self) -> None:
+        if self.args.funcinfo is None:
+            print("error: source file contains autofunc, but no funcinfo file was supplied", file=sys.stderr)
+            sys.exit(1)
+        result = Code(self.funcs["!!top!!"]["content"])
+        del self.funcs["!!top!!"]
+        funcnames_in_funcinfo: list[str] = []
+        with open(self.args.funcinfo, "r", encoding="utf-8") as infile:
+            reader = csv.reader(infile)
+            header = next(reader)
+            name_idx = header.index("name")
+            type_idx = header.index("type")
+            id_idx = header.index("id")
+            arg0_idx = header.index("arg0") if "arg0" in header else None
+            retval0_idx = header.index("retval0") if "retval0" in header else None
+            for row in reader:
+                if row == []:
+                    continue
+                try:
+                    func = self.funcs[row[name_idx]]
+                    match row[type_idx]:
+                        case "raw":
+                            result.add_line(rf";\func {int(row[id_idx],0):#b}")
+                            self.funcs[row[name_idx]]["id"] = int(row[id_idx], 0)
+                        case "std":
+                            result.add_line(rf";\func 0b11{int(row[id_idx],0):b}")
+                            self.funcs[row[name_idx]]["id"] = int(f"0b11{int(row[id_idx],0):b}", 2)
+                        case "usr":
+                            result.add_line(rf";\func 0b10{int(row[id_idx],0):b}")
+                            self.funcs[row[name_idx]]["id"] = int(f"0b10{int(row[id_idx],0):b}", 2)
+                        case _:
+                            print(f"error: unknown functype '{row[type_idx]}' for func '{row[name_idx]}'")
+                            print(rf"func_id from_annotation: {func['id']}, from funcinfo file: {row[id_idx]}")
+                            sys.exit(1)
+                    result.add_lines(func["content"].splitlines())
+                    funcnames_in_funcinfo.append(row[name_idx])
+                except KeyError:
+                    print(
+                        f"warn: func '{row[name_idx]} is in funcinfo file, but not in source code, thus not implemented'"
+                    )
+                    match row[type_idx]:
+                        case "std":
+                            full_id = int(f"0b11{int(row[id_idx],0):b}", 0)
+                        case "usr":
+                            full_id = int(f"0b10{int(row[id_idx],0):b}", 0)
+                        case "raw":
+                            full_id = int(row[id_idx], 0)
+                        case _:
+                            print(f"error: unknown functype '{row[type_idx]}' for func '{row[name_idx]}'")
+                            print(rf"func_id from funcinfo file: {row[id_idx]}")
+                            sys.exit(1)
+                    result.add_line(rf";\func {full_id:#b}")
+                    if arg0_idx is None:
+                        func_args = None
+                    else:
+                        func_args = []
+                        for i in range(arg0_idx, retval0_idx if retval0_idx is not None else len(header)):
+                            if row[i] != "":
+                                func_args.append(row[i])
+                    if retval0_idx is None:
+                        retvals = None
+                    else:
+                        retvals = []
+                        for i in range(retval0_idx, len(header)):
+                            if row[i] != "":
+                                retvals.append(row[i])
+
+                    def stringize_typelist(typelist: list[str] | None) -> str:
+                        return "none" if typelist is None else ", ".join(typelist)
+
+                    result.add_line(
+                        rf";\{row[name_idx]} {stringize_typelist(func_args)} -> {stringize_typelist(retvals)}"
+                    )
+                    result.add_line(";TODO: implement this function")
+                    self.funcs[row[name_idx]] = FuncBody(id=full_id, content="")
+            for name in set(self.funcs) - set(funcnames_in_funcinfo):
+                print(f"warn: function '{name}' is in source code, but not in funcinfo file")
+        self.code = result
+
+    def resolve_callfunc(self) -> None:
+        result = Code()
+        for line in self.code:
+            callfunc_match = re.search(r"(?P<indent> *)\\call +(?P<func_name>[a-zA-Z0-9_]+)", line)
+            if callfunc_match is None:
+                result.add_line(line)
                 continue
-            try:
-                func = funcs[row[name_idx]]
-                match row[type_idx]:
-                    case "raw":
-                        result += rf";\func {int(row[id_idx],0):#b}"
-                        funcs[row[name_idx]]["id"] = int(row[id_idx], 0)
-                    case "std":
-                        result += rf";\func 0b11{int(row[id_idx],0):b}"
-                        funcs[row[name_idx]]["id"] = int(f"0b11{int(row[id_idx],0):b}", 2)
-                    case "usr":
-                        result += rf";\func 0b10{int(row[id_idx],0):b}"
-                        funcs[row[name_idx]]["id"] = int(f"0b10{int(row[id_idx],0):b}", 2)
-                    case _:
-                        print(f"error: unknown functype '{row[type_idx]}'")
-                        result += rf";!error func from_annotation: {func['id']}, from funcinfo file: {row[id_idx]}"
-                result += "\n"
-                result += func["content"]
-                funcnames_in_funcinfo.append(row[name_idx])
-            except KeyError:
-                print(f"warn: func '{row[name_idx]} is in funcinfo file, but not in source code, thus not implemented'")
-                result += rf";\func {int(row[id_idx],0):#b}"
-                result += "\n"
-                if arg0_idx is None:
-                    args = None
-                else:
-                    args = []
-                    for i in range(arg0_idx, retval0_idx if retval0_idx is not None else len(header)):
-                        if row[i] != "":
-                            args.append(row[i])
-                if retval0_idx is None:
-                    retvals = None
-                else:
-                    retvals = []
-                    for i in range(retval0_idx, len(header)):
-                        if row[i] != "":
-                            retvals.append(row[i])
+            result.set_indent(callfunc_match["indent"])
+            result.add_line(f"@{{{callfunc_match['func_name']}}}")
+            func_id = self.funcs[callfunc_match["func_name"]]["id"]
+            num_shift = math.floor(len(f"{func_id:b}") / 8)
+            if num_shift != 0:
+                result.add_line("push8s1")
+                result.add_line("xchg13")
+                result.add_line("xchg03")
+                result.add_line("${8}")
+                result.add_line("pop8s0")
+                result.add_line("xchg03")
+                result.add_line("xchg13")
+                for _ in range(num_shift):
+                    result.add_line("lshift")
+                    result.add_line("xchg23")
+                    result.add_line("xchg03")
+                    result.add_line("pop8s0")
+            result.add_line("call")
+            result.set_indent("")
+        self.code = result
 
-                def stringize_typelist(typelist: list[str] | None) -> str:
-                    return "none" if typelist is None else ", ".join(typelist)
+    def resolve_funcref(self) -> None:
+        result = Code()
+        for line in self.code:
+            ref_match = re.search("(?P<indent> *)@{(?P<func_name>[a-zA-Z0-9_]+)}", line)
+            if ref_match is None:
+                result.add_line(line)
+                continue
+            func_id = self.funcs[ref_match["func_name"]]["id"]
+            result.set_indent(ref_match["indent"])
+            result.add_line(f"${{{func_id}}}")
+            result.set_indent("")
+        self.code = result
 
-                result += rf";\{row[name_idx]} {stringize_typelist(args)} -> {stringize_typelist(retvals)}"
-                result += "\n"
-                result += ";TODO: implement this function"
-                result += "\n"
-        for name in set(funcs) - set(funcnames_in_funcinfo):
-            print(f"warn: function '{name}' is in source code, but not in funcinfo file")
-    return cast(Lan22WithFuncrefStr, result)
+    def resolve_literal(self) -> None:
+        result = Code()
+        for line in self.code:
+            literal_match = re.search(r"(?P<indent> *)\${(?P<value>.+)}", line)
+            if literal_match is None:
+                result.add_line(line)
+                continue
+            result.set_indent(literal_match["indent"])
+            value = int(literal_match["value"], 0)
+            for digit in f"{value:b}":
+                result.add_line("one" if digit == "1" else "zero")
+            result.set_indent("")
+        self.code = result
 
-
-def resolve_funcref(args, code: Lan22WithFuncrefStr, funcs: dict[str, FuncBody]) -> PureLan22Str:
-    result = ""
-    for line in code.splitlines(keepends=True):
-        ref_match = re.search("(?P<indent> *)@{(?P<func_name>[a-zA-Z0-9_]+)}", line)
-        if ref_match is None:
-            result += line
-            continue
-        func_id = funcs[ref_match["func_name"]]["id"]
-        for digit in f"{func_id:b}":
-            result += ref_match["indent"]
-            result += "one\n" if digit == "1" else "zero\n"
-    return cast(PureLan22Str, result)
+    def resolve_all(self) -> None:
+        self.resolve_callfunc()
+        self.resolve_funcref()
+        self.resolve_literal()
 
 
 def emit_22lan(args):
@@ -233,14 +330,11 @@ def emit_22lan(args):
             print(f"warn: mismatching startfunc and endfunc in function '{name}'")
         elif check_result == False:
             print(f"warn: function '{name}' doesn't have implementation")
+    resolver = ExtensionResolver(args, funcs)
 
-    if any([func["id"] < 0 for func in funcs.values()]):
-        code = resolve_autofuncs(args, funcs)
-    else:
-        with open(args.source, "r", encoding="utf-8") as infile:
-            code = cast(Lan22WithFuncrefStr, infile.read())
     with open(args.output, "w", encoding="utf-8") as outfile:
-        outfile.write(resolve_funcref(args, code, funcs))
+        resolver.resolve_all()
+        outfile.write(resolver.code.as_str())
 
 
 def main():

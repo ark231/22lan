@@ -4,9 +4,10 @@ TYPE: /[rs][0123]_[0-9]+/
 REGISTER.1: /r[0123]/
 CONST: "const"
 INVALIDATED: "invalidated"
+RESULT: "result"
 NONE: "none"
 
-register_status: CONST|INVALIDATED
+register_status: CONST|INVALIDATED|RESULT
 
 type_list: (TYPE|NONE) ("," (TYPE|NONE))* 
 
