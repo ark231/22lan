@@ -160,8 +160,11 @@ CPlusPlusGenerator{{
         for func in self.functions:
             lan22_initializer.add_step(f"ftable[{func.fid}]=&{func.name};")
 
-        for byte in reversed(base64.b32decode(self.initial_s1_base32 + "=" * (8 - len(self.initial_s1_base32) % 8))):
-            lan22_initializer.add_step(f"s1.push({byte});")
+        if self.initial_s1_base32 != "":
+            for byte in reversed(
+                base64.b32decode(self.initial_s1_base32 + "=" * (8 - len(self.initial_s1_base32) % 8))
+            ):
+                lan22_initializer.add_step(f"s1.push({byte});")
         lan22_initializer.add_step("r0 = 0;")
         lan22_initializer.add_step("r1 = 0;")
         lan22_initializer.add_step("r2 = 0;")

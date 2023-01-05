@@ -3,7 +3,7 @@ COMMENT: /;.*/
 BASE32:/[A-Z0-9]+/
 
 line: INSTRUCTION|BASE32
-start: (line? COMMENT? "\n")+
+start: (line? COMMENT? "\n")* (line? COMMENT? "\n"?)
 
 
 %ignore " "

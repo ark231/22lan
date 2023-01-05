@@ -270,6 +270,8 @@ class ExtensionResolver:
             result.add_line(f"@{{{callfunc_match['func_name']}}}")
             func_id = self.funcs[callfunc_match["func_name"]]["id"]
             num_shift = math.floor(len(f"{func_id:b}") / 8)
+            result.add_line("pushl8")
+            result.add_line("pop8s0")
             if num_shift != 0:
                 result.add_line("push8s1")
                 result.add_line("xchg13")
@@ -282,6 +284,7 @@ class ExtensionResolver:
                     result.add_line("lshift")
                     result.add_line("xchg23")
                     result.add_line("xchg03")
+                    result.add_line("pushl8")
                     result.add_line("pop8s0")
             result.add_line("call")
             result.set_indent("")
