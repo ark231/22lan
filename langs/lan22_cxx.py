@@ -51,8 +51,10 @@ class Function:
             match = re.match(f"( *){GOTO}", step)
             if match:
                 lines = []
+                lines.append(f"    {match[1]}switch(r0){{\n")
                 for label in self.labels:
-                    lines.append(f"    {match[1]}if(r0 == {label.lid}){{goto {label.name};}}\n")
+                    lines.append(f"    {match[1]}    case {label.lid}:goto {label.name};break;\n")
+                lines.append(f"    {match[1]}}}\n")
                 for line in lines:
                     result += line
             else:

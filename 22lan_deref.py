@@ -5,12 +5,15 @@ import argparse
 from pathlib import Path
 import csv
 import re
-from langs import lan22_annotation, base
 from typing import cast, Final, ClassVar, TypedDict, NewType, TypeVar, Generic, Literal
 import io
 from enum import Enum, auto
 from lark.lexer import Token
 import math
+import sympy
+from sympy.parsing import sympy_parser
+
+from langs import lan22_annotation, base
 
 SUFFIXES: Final[dict[str, str]] = {"22lan": ".22l", "funcinfo": ".ext.csv", "22lan_extended": ".22le"}
 
@@ -23,7 +26,7 @@ AUTOFUNC_STD_PATTERN = r";\\autofunc +std"
 AUTOFUNC_USR_PATTERN = r";\\autofunc +usr"
 
 
-def escape_extensions(filename: str, funcref=True, autofunc=True) -> str:
+def escape_extensions(filename: str, funcref=True, autofunc=True, pseudo_ops=True) -> str:
     escaped = ""
     with open(filename, "r", encoding="utf-8") as infile:
         for line in infile:
@@ -32,6 +35,8 @@ def escape_extensions(filename: str, funcref=True, autofunc=True) -> str:
             if autofunc:
                 line = re.sub(AUTOFUNC_STD_PATTERN, r";\\func -0b1", line)
                 line = re.sub(AUTOFUNC_USR_PATTERN, r";\\func -0b10", line)
+            if pseudo_ops:
+                line = re.sub(r"( *)(\\.*)", r";\1\2", line)
             escaped += line
     return escaped
 
@@ -117,7 +122,7 @@ class AnnotationDistinguisher(lan22_annotation.AnnotationRetriever):
 
 
 def split_funcs(args) -> dict[str, FuncBody]:
-    escaped = escape_extensions(args.source, funcref=False)
+    escaped = escape_extensions(args.source, funcref=False, pseudo_ops=False)
     funcs: dict[str, FuncBody] = {"!!top!!": FuncBody(id=-2, content="")}
     current_name: str = "!!top!!"
     for line in escaped.splitlines(keepends=True):
@@ -166,13 +171,19 @@ class Code:
     def __getitem__(self, index: int) -> str:
         return self._code[index]
 
+    def __add__(self, other) -> "Code":
+        result = Code()
+        result._code = self._code + other._code
+        result._indent = other._indent
+        return result
+
 
 class ExtensionResolver:
-    code: Code
-
     def __init__(self, args, funcs: dict[str, FuncBody]) -> None:
         self.args = args
         self.funcs = funcs
+        self.code = Code()
+        self.labels: dict[int, dict[str, int]] = {}
         if any([func["id"] < 0 for func in funcs.values()]):
             self.code = Code()
             self._resolve_autofuncs()
@@ -259,36 +270,135 @@ class ExtensionResolver:
                 print(f"warn: function '{name}' is in source code, but not in funcinfo file")
         self.code = result
 
-    def resolve_callfunc(self) -> None:
+    def _mangle_label(self, func_index: int, name: str):
+        return f"__F{func_index}L_{name}"
+
+    def resolve_pseudo_ops(self) -> None:
         result = Code()
+        current_func_index = 0
+        current_autolabel_id = 0
+
         for line in self.code:
-            callfunc_match = re.search(r"(?P<indent> *)\\call +(?P<func_name>[a-zA-Z0-9_]+)", line)
-            if callfunc_match is None:
+            operation_match = re.search(r"(?P<indent> *)(?P<op>[a-z0-9_]+)", line)
+            pseudo_match = re.search(r"^(?P<indent> *)\\(?P<pseudo_op>[a-zA-Z0-9_]+) +(?P<pseudo_arg>.+)", line)
+            if operation_match is not None:
+                if operation_match["op"] == "startfunc":
+                    self.labels[current_func_index] = {}
+                elif operation_match["op"] == "endfunc":
+                    current_func_index += 1
+                    current_autolabel_id = 0
+            if pseudo_match is None:
                 result.add_line(line)
                 continue
-            result.set_indent(callfunc_match["indent"])
-            result.add_line(f"@{{{callfunc_match['func_name']}}}")
-            func_id = self.funcs[callfunc_match["func_name"]]["id"]
-            num_shift = math.floor(len(f"{func_id:b}") / 8)
-            result.add_line("pushl8")
-            result.add_line("pop8s0")
-            if num_shift != 0:
-                result.add_line("push8s1")
-                result.add_line("xchg13")
-                result.add_line("xchg03")
+            if pseudo_match["pseudo_op"] == "func":
+                result.add_line(line)
+            elif pseudo_match["pseudo_op"] == "call":
+                result += self.resolve_callfunc(pseudo_match["indent"], pseudo_match["pseudo_arg"])
+            elif pseudo_match["pseudo_op"] == "pushl8":
+                result.add_line(f"${{{pseudo_match['pseudo_arg']}}}")
+                result.add_line("pushl8")
+            elif pseudo_match["pseudo_op"] == "autolabel":
+                labelname_match = re.search(r"(?P<name>[a-zA-Z0-9_]+)", pseudo_match["pseudo_arg"])
+                if labelname_match is None:
+                    print("error: no labelname at autolabel pseudo_op")
+                    result.add_line(f"!!!!!!!error!!!!!!! {line}")
+                    continue
+                result.add_line(f"${{{current_autolabel_id}}}")
+                result.add_line("deflabel")
+                self.labels[current_func_index][labelname_match["name"]] = current_autolabel_id
+                current_autolabel_id += 1
+            elif pseudo_match["pseudo_op"] == "autopushltor0":
+                reflabel_pattern = r"l{(?P<name>[a-zA-Z0-9_]+)}"
+                expr = pseudo_match["pseudo_arg"]
+                for labelname in set(re.findall(reflabel_pattern, expr)):
+                    expr = re.sub(f"l{{{labelname}}}", self._mangle_label(current_func_index, labelname), expr)
+                result.add_line(f"%autopushltor0 {expr}")
+            else:
+                print(f'error: unknown pseudo operation "{pseudo_match["pseudo_op"]}"')
+                result.add_line(f"!!!!!!!error!!!!!!! '{line}'")
+        self.code = result
+
+    def eval(self, expr: str) -> int:
+        result = 0
+        parsed_expr = sympy_parser.parse_expr(expr)
+        replacements = []
+        for func_index, labels in self.labels.items():
+            for name, value in labels.items():
+                mangled_label_name = f"__F{func_index}L_{name}"
+                replacements.append((sympy.Symbol(mangled_label_name), value))
+        result = int(parsed_expr.subs(replacements))
+        return result
+
+    def resolve_dependant_pseudo_ops(self) -> None:
+        result = Code()
+        current_func_index = 1
+        for line in self.code:
+            operation_match = re.search(r"(?P<indent> *)(?P<op>[a-z0-9_]+)", line)
+            pseudo_match = re.search(r"(?P<indent> *)%(?P<pseudo_op>[a-zA-Z0-9_]+) +(?P<pseudo_arg>.+)", line)
+            if operation_match is not None:
+                if operation_match["op"] == "endfunc":
+                    current_func_index += 1
+            if pseudo_match is None:
+                result.add_line(line)
+                continue
+            if pseudo_match["pseudo_op"] == "autopushltor0":
+                value = self.eval(pseudo_match["pseudo_arg"])
+                size = math.ceil(len(f"{value:b}") / 8)
+                value = list(value.to_bytes(size, "big"))
+                result.add_line("xchg13")  # save r1 to r3
+                # load 8 to r1_8
                 result.add_line("${8}")
+                result.add_line("pushl8")
                 result.add_line("pop8s0")
                 result.add_line("xchg03")
                 result.add_line("xchg13")
-                for _ in range(num_shift):
-                    result.add_line("lshift")
-                    result.add_line("xchg23")
-                    result.add_line("xchg03")
+                result.add_line("xchg03")
+
+                is_first = True
+                for byte in value:
+                    if not is_first:
+                        result.add_line("lshift")
+                        result.add_line("xchg23")
+                        result.add_line("xchg03")
+                        result.add_line("xchg23")
+                    else:
+                        is_first = False
+
+                    result.add_line(f"${{{byte}}}")
                     result.add_line("pushl8")
                     result.add_line("pop8s0")
-            result.add_line("call")
-            result.set_indent("")
+                result.add_line("xchg13")  # restore r1 from r3
+            else:
+                print(f'error: unknown dependant pseudo operation "{pseudo_match["pseudo_op"]}"')
+                result.add_line(f"!!!!!!!error!!!!!!! '{line}'")
         self.code = result
+
+    def resolve_callfunc(self, indent: str, pseudo_arg: str) -> Code:
+        result = Code()
+        result.set_indent(indent)
+        func_name = pseudo_arg.replace(" ", "")
+        result.add_line(f"@{{{func_name}}}")
+        func_id = self.funcs[func_name]["id"]
+        num_shift = math.floor(len(f"{func_id:b}") / 8)
+        result.add_line("pushl8")
+        result.add_line("pop8s0")
+        if num_shift != 0:
+            result.add_line("push8s1")
+            result.add_line("xchg13")
+            result.add_line("xchg03")
+            result.add_line("${8}")
+            result.add_line("pop8s0")
+            result.add_line("xchg03")
+            result.add_line("xchg13")
+            for _ in range(num_shift):
+                result.add_line("lshift")
+                result.add_line("xchg23")
+                result.add_line("xchg03")
+                result.add_line("pushl8")
+                result.add_line("pop8s0")
+        result.add_line("call")
+        result.set_indent("")
+        return result
 
     def resolve_funcref(self) -> None:
         result = Code()
@@ -318,7 +428,8 @@ class ExtensionResolver:
         self.code = result
 
     def resolve_all(self) -> None:
-        self.resolve_callfunc()
+        self.resolve_pseudo_ops()
+        self.resolve_dependant_pseudo_ops()
         self.resolve_funcref()
         self.resolve_literal()
 

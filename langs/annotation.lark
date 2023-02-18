@@ -12,7 +12,7 @@ register_status: CONST|INVALIDATED|RESULT
 type_list: (TYPE|NONE) ("," (TYPE|NONE))* 
 
 deffunc: "func" FUNC_ID
-funcinfo: FUNC_NAME type_list "->" type_list
+funcinfo: "@" FUNC_NAME type_list "->" type_list
 register_info: REGISTER ":" register_status 
 register_info_list: register_info ("," register_info)*
 
