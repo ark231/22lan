@@ -290,6 +290,9 @@ class ExtensionResolver:
             if pseudo_match is None:
                 result.add_line(line)
                 continue
+            result.set_indent(pseudo_match["indent"])
+            if self.args.debug:
+                result.add_line(f";debug: {line.strip(' ')}")
             if pseudo_match["pseudo_op"] == "func":
                 result.add_line(line)
             elif pseudo_match["pseudo_op"] == "call":
@@ -316,6 +319,8 @@ class ExtensionResolver:
             else:
                 print(f'error: unknown pseudo operation "{pseudo_match["pseudo_op"]}"')
                 result.add_line(f"!!!!!!!error!!!!!!! '{line}'")
+            result.add_line(";debug: end pseudo operation")
+            result.set_indent("")
         self.code = result
 
     def eval(self, expr: str) -> int:
@@ -341,18 +346,20 @@ class ExtensionResolver:
             if pseudo_match is None:
                 result.add_line(line)
                 continue
+            result.set_indent(pseudo_match["indent"])
             if pseudo_match["pseudo_op"] == "autopushltor0":
                 value = self.eval(pseudo_match["pseudo_arg"])
                 size = math.ceil(len(f"{value:b}") / 8)
                 value = list(value.to_bytes(size, "big"))
-                result.add_line("xchg13")  # save r1 to r3
-                # load 8 to r1_8
-                result.add_line("${8}")
-                result.add_line("pushl8")
-                result.add_line("pop8s0")
-                result.add_line("xchg03")
-                result.add_line("xchg13")
-                result.add_line("xchg03")
+                if size >= 2:
+                    result.add_line("xchg13")  # save r1 to r3
+                    # load 8 to r1_8
+                    result.add_line("${8}")
+                    result.add_line("pushl8")
+                    result.add_line("pop8s0")
+                    result.add_line("xchg03")
+                    result.add_line("xchg13")
+                    result.add_line("xchg03")
 
                 is_first = True
                 for byte in value:
@@ -371,6 +378,7 @@ class ExtensionResolver:
             else:
                 print(f'error: unknown dependant pseudo operation "{pseudo_match["pseudo_op"]}"')
                 result.add_line(f"!!!!!!!error!!!!!!! '{line}'")
+            result.set_indent("")
         self.code = result
 
     def resolve_callfunc(self, indent: str, pseudo_arg: str) -> Code:
@@ -397,7 +405,6 @@ class ExtensionResolver:
                 result.add_line("pushl8")
                 result.add_line("pop8s0")
         result.add_line("call")
-        result.set_indent("")
         return result
 
     def resolve_funcref(self) -> None:
