@@ -129,7 +129,7 @@ class ExtensionResolver:
             elif pseudo_match["pseudo_op"] == "call":
                 result += self.resolve_callfunc(pseudo_match["indent"], pseudo_match["pseudo_arg"])
             elif pseudo_match["pseudo_op"] == "pushl8":
-                result.add_line(f"${{{pseudo_match['pseudo_arg']}}}")
+                result.add_line(f"${{{pseudo_match['pseudo_arg']}:8}}")
                 result.add_line("pushl8")
             elif pseudo_match["pseudo_op"] == "autolabel":
                 labelname_match = re.search(r"(?P<name>[a-zA-Z0-9_]+)", pseudo_match["pseudo_arg"])
@@ -254,14 +254,28 @@ class ExtensionResolver:
     def resolve_literal(self) -> None:
         result = common.Code()
         for line in self.code:
-            literal_match = re.search(r"(?P<indent> *)\${(?P<value>.+)}", line)
+            VALUE_PATTERN = r"(?P<number>[-+xob_0-9]+)(:(?P<bitwidth>[0-9]+))?"
+            literal_match = re.search(rf"(?P<indent> *)\${{{VALUE_PATTERN}}}", line)
             if literal_match is None:
                 result.add_line(line)
                 continue
             result.set_indent(literal_match["indent"])
-            value = int(literal_match["value"], 0)
-            for digit in f"{value:b}":
-                result.add_line("one" if digit == "1" else "zero")
+            value = int(literal_match["number"], 0)
+            if literal_match["bitwidth"]:
+                bitwidth = int(literal_match["bitwidth"])
+            else:
+                bitwidth = 64
+            if value >= 0:
+                binary = f"{value:b}"
+                if len(binary) > bitwidth:
+                    print(f"error: number {value} cannot be expressed with {bitwidth} bit unsigned integer")
+                    result.add_line(f"!!!!!!!error!!!!!!! {line}")
+                else:
+                    for digit in binary:
+                        result.add_line("one" if digit == "1" else "zero")
+            else:
+                for digit in f"{2**bitwidth - abs(value):b}":
+                    result.add_line("one" if digit == "1" else "zero")
             result.set_indent("")
         self.code = result
 
