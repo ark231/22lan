@@ -26,7 +26,7 @@ AUTOFUNC_STD_PATTERN = r";\\autofunc +std"
 AUTOFUNC_USR_PATTERN = r";\\autofunc +usr"
 
 
-def escape_extensions(filename: str, funcref=True, autofunc=True, pseudo_ops=True) -> str:
+def escape_extensions(filename: str, funcref=True, autofunc=True, pseudo_ops=True, macro=True) -> str:
     escaped = ""
     with open(filename, "r", encoding="utf-8") as infile:
         for line in infile:
@@ -36,7 +36,9 @@ def escape_extensions(filename: str, funcref=True, autofunc=True, pseudo_ops=Tru
                 line = re.sub(AUTOFUNC_STD_PATTERN, r";\\func -0b1", line)
                 line = re.sub(AUTOFUNC_USR_PATTERN, r";\\func -0b10", line)
             if pseudo_ops:
-                line = re.sub(r"( *)(\\.*)", r";\1\2", line)
+                line = re.sub(r"( *)(\\.*)", r"\1;\2", line)
+            if macro:
+                line = re.sub(r"( *)(#.*)", r"\1;\2", line)
             escaped += line
     return escaped
 
@@ -119,6 +121,9 @@ class AnnotationDistinguisher(lan22_annotation.AnnotationRetriever):
     def funcinfo(self, nodes: list[Token]):
         self.type = AnnotationType.funcinfo
         self.info["name"] = nodes[0].value
+
+    def other(self, _):
+        self.type = AnnotationType.other
 
 
 def split_funcs(args) -> dict[str, FuncBody]:

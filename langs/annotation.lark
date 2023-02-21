@@ -6,6 +6,7 @@ CONST: "const"
 INVALIDATED: "invalidated"
 RESULT: "result"
 NONE: "none"
+ANY.-2: /.+/
 
 register_status: CONST|INVALIDATED|RESULT
 
@@ -15,7 +16,9 @@ deffunc: "func" FUNC_ID
 funcinfo: "@" FUNC_NAME type_list "->" type_list
 register_info: REGISTER ":" register_status 
 register_info_list: register_info ("," register_info)*
+other: ANY
 
-start: ";"(("\\"(deffunc|funcinfo|register_info_list))|/ *[^\\].*/)?
+
+start: ";"(("\\"(deffunc|funcinfo|register_info_list|other))|/ *[^\\].*/)?
 
 %ignore " "

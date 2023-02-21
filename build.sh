@@ -6,6 +6,6 @@ STD="gnu++20"
 
 result_name=$(basename $1 .22l)
 
-$script_dir/22lan_cxx.py -s $1 -o $result_name.cpp
+$script_dir/22lan.py -s $1 -l cxx -o $result_name.cpp
 
 $CC -std=$STD -o $result_name $result_name.cpp
