@@ -77,7 +77,7 @@ class FuncDeclarationSolver:
                         return "none" if typelist is None else ", ".join(typelist)
 
                     result.add_line(
-                        rf";\{row[name_idx]} {stringize_typelist(func_args)} -> {stringize_typelist(retvals)}"
+                        rf";\@{row[name_idx]} {stringize_typelist(func_args)} -> {stringize_typelist(retvals)}"
                     )
                     result.add_line(";TODO: implement this function")
             for name in set(self.funcs) - set(funcnames_in_funcinfo):

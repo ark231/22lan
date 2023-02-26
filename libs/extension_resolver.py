@@ -7,6 +7,7 @@ from sympy.parsing import sympy_parser
 import re
 
 from . import common
+from .macro_resolver import MacroResolver
 
 
 class ExtensionResolver:
@@ -150,7 +151,8 @@ class ExtensionResolver:
             else:
                 print(f'error: unknown pseudo operation "{pseudo_match["pseudo_op"]}"')
                 result.add_line(f"!!!!!!!error!!!!!!! '{line}'")
-            result.add_line(";debug: end pseudo operation")
+            if self.args.debug:
+                result.add_line(";debug: end pseudo operation")
             result.set_indent("")
         self.code = result
 
@@ -279,7 +281,13 @@ class ExtensionResolver:
             result.set_indent("")
         self.code = result
 
+    def resolve_macro(self) -> None:
+        resolver = MacroResolver(self.args, self.code)
+        resolver.expand_macro()
+        self.code = resolver.code
+
     def resolve_all(self) -> None:
+        self.resolve_macro()
         self.resolve_pseudo_ops()
         self.resolve_dependant_pseudo_ops()
         self.resolve_funcref()
