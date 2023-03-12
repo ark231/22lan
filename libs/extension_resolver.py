@@ -5,6 +5,7 @@ import math
 import sympy
 from sympy.parsing import sympy_parser
 import re
+from pathlib import Path
 
 from . import common
 from .macro_resolver import MacroResolver
@@ -22,11 +23,30 @@ class ExtensionResolver:
         else:
             with open(args.source, "r", encoding="utf-8") as infile:
                 self.code = common.Code(infile.read())
+        if self.args.external is not None:
+            for external_funcinfo_file in self.args.external:
+                with open(external_funcinfo_file, "r", encoding="utf-8") as infile:
+                    reader = csv.reader(infile)
+                    header = next(reader)
+                    name_idx = header.index("name")
+                    type_idx = header.index("type")
+                    id_idx = header.index("id")
+                    for row in reader:
+                        if row == []:
+                            continue
+                        new_func = common.FuncBody()
+                        match row[type_idx]:
+                            case "raw":
+                                new_func["id"] = int(row[id_idx], 0)
+                            case "std":
+                                new_func["id"] = int(f"0b11{int(row[id_idx],0):b}", 2)
+                            case "usr":
+                                new_func["id"] = int(f"0b10{int(row[id_idx],0):b}", 2)
+                            case _:
+                                print(f"error: unknown functype '{row[type_idx]}' for func '{row[name_idx]}'")
+                        self.funcs[row[name_idx]] = new_func
 
     def _resolve_autofuncs(self) -> None:
-        if self.args.funcinfo is None:
-            print("error: source file contains autofunc, but no funcinfo file was supplied", file=sys.stderr)
-            sys.exit(1)
         result = common.Code(self.funcs["!!top!!"]["content"])
         del self.funcs["!!top!!"]
         funcnames_in_funcinfo: list[str] = []
@@ -132,6 +152,10 @@ class ExtensionResolver:
             elif pseudo_match["pseudo_op"] == "pushl8":
                 result.add_line(f"${{{pseudo_match['pseudo_arg']}:8}}")
                 result.add_line("pushl8")
+            elif pseudo_match["pseudo_op"] == "pushl64":
+                result.add_line(f"${{{pseudo_match['pseudo_arg']}:64}}")
+                for _ in range(8):
+                    result.add_line("pushl8")
             elif pseudo_match["pseudo_op"] == "autolabel":
                 labelname_match = re.search(r"(?P<name>[a-zA-Z0-9_]+)", pseudo_match["pseudo_arg"])
                 if labelname_match is None:
@@ -207,7 +231,8 @@ class ExtensionResolver:
                     result.add_line(f"${{{byte}}}")
                     result.add_line("pushl8")
                     result.add_line("pop8s0")
-                result.add_line("xchg13")  # restore r1 from r3
+                if size >= 2:
+                    result.add_line("xchg13")  # restore r1 from r3
             else:
                 print(f'error: unknown dependant pseudo operation "{pseudo_match["pseudo_op"]}"')
                 result.add_line(f"!!!!!!!error!!!!!!! '{line}'")
@@ -237,6 +262,7 @@ class ExtensionResolver:
                 result.add_line("xchg03")
                 result.add_line("pushl8")
                 result.add_line("pop8s0")
+            result.add_line("pop8s1")
         result.add_line("call")
         return result
 

@@ -21,7 +21,7 @@ class MacroResolver:
         current_macro_name = None
         code_without_macro_definition = common.Code()
         for line in self.code:
-            match = re.search(r"^ *#defmacro (?P<name>[a-zA-Z0-9_]+) +(?P<argdecl>.+)?", line)
+            match = re.search(r"^ *#defmacro (?P<name>[a-zA-Z0-9_]+)( +(?P<argdecl>.+))?", line)
             if match is not None:
                 current_macro_name = match["name"]
                 argnames = []
@@ -43,7 +43,7 @@ class MacroResolver:
         result = common.Code()
         macro_found = False
         for line in code:
-            match = re.search(r"^(?P<indent> *)#(?P<name>[a-zA-Z0-9_]+) +(?P<args>.+)?", line)
+            match = re.search(r"^(?P<indent> *)#(?P<name>[a-zA-Z0-9_]+)( +(?P<args>.+))?", line)
             if match:
                 macro_found = True
                 args = []

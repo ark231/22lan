@@ -147,7 +147,8 @@ def split_funcs(args) -> dict[str, common.FuncBody]:
                 funcs[current_name]["content"] += line
         else:
             funcs[current_name]["content"] += line
-    del funcs["!!new!!"]
+    if "!!new!!" in funcs:
+        del funcs["!!new!!"]
     return funcs
 
 
@@ -196,6 +197,7 @@ def main():
     )
     parser.add_argument("-s", "--source", help="source file", required=True)
     parser.add_argument("-f", "--funcinfo", help="function information file")
+    parser.add_argument("-e", "--external", help="external function information file(s)", nargs="+")
     parser.add_argument("-o", "--output", help="output filename (in result folder)")
     parser.add_argument("-l", "--lang", help="output language", choices=SUFFIXES.keys(), default="22lan")
     parser.add_argument("-d", "--debug", action="store_true", help="enable debug output")
@@ -203,6 +205,8 @@ def main():
 
     if args.output is None:
         args.output = Path(args.source).with_suffix(SUFFIXES[args.lang])
+    if args.funcinfo is None:
+        args.funcinfo = Path(args.source).with_suffix(".ext.csv")
     if Path(args.output) == Path(args.source):
         print("source and output is the same. are you sure to overwrite the source file?")
         while True:

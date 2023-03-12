@@ -44,8 +44,8 @@ class AnnotationRetriever(base.BasicGenerator[AnnotationTree]):
 
 
 class FuncInfoTableGenerator(base.BasicGenerator[base.Lan22Tree]):
-    def __init__(self, parser: type[base.BasicParser] = AnnotationParser):
-        super().__init__()
+    def __init__(self, parser: type[base.BasicParser] = AnnotationParser, debug_level=0):
+        super().__init__(debug_level=debug_level)
         self.retriever = AnnotationRetriever()
         self.parser = parser
 

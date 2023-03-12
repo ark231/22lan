@@ -10,14 +10,15 @@ SUFFIXES: Final[dict[str, str]] = {"nyulan": ".nyu", "cxx": ".cpp", "annotation"
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="convert 22lan source code to specified language", prog="22lan.py")
-    parser.add_argument("-s", "--source", help="source file", required=True)
+    parser.add_argument("-s", "--source", help="source file", required=True, nargs="+")
     parser.add_argument("-o", "--output", help="output filename (in result folder)")
     parser.add_argument("-l", "--lang", help="output language", choices=SUFFIXES.keys(), default="nyulan")
-    parser.add_argument("-d", "--debug", action="store_true", help="enable debug output")
+    parser.add_argument("-d", "--debug", help="enable debug output", type=int, default=0)
     args = parser.parse_args()
 
     if args.output is None:
-        args.output = Path(args.source).with_suffix(SUFFIXES[args.lang])
+        # args.output = Path(args.source).with_suffix(SUFFIXES[args.lang])
+        args.output = Path("a").with_suffix(SUFFIXES[args.lang])
 
     match args.lang:
         case "nyulan":
@@ -29,15 +30,20 @@ def main() -> None:
         case _:
             Generator = lan22_nyulan.NyulanGenerator
 
-    with open(args.source, "r", encoding="utf8") as sourcefile:
-        parsed_data = base.Lan22Parser.parse(sourcefile.read())
-    generator = Generator()
+    concatenated_source = ""
+    for source in args.source:
+        with open(source, "r", encoding="utf8") as sourcefile:
+            concatenated_source += sourcefile.read()
+            concatenated_source += "\n"
+
+    parsed_data = base.Lan22Parser.parse(concatenated_source)
+    generator = Generator(debug_level=args.debug)
     try:
         generator.from_tree(parsed_data)
     except base.ParseError as e:
         print(sys.stderr, f"parse error at {args.source}:{e.linenum} info:{e}")
 
-    if args.debug:
+    if args.debug >= 1:
         print(generator)
 
     with open(args.output, "w", encoding="utf8") as outfile:

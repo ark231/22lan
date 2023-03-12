@@ -74,7 +74,7 @@ class FuncDeclarationSolver:
                                 retvals.append(row[i])
 
                     def stringize_typelist(typelist: list[str] | None) -> str:
-                        return "none" if typelist is None else ", ".join(typelist)
+                        return "none" if typelist is None or len(typelist) == 0 else ", ".join(typelist)
 
                     result.add_line(
                         rf";\@{row[name_idx]} {stringize_typelist(func_args)} -> {stringize_typelist(retvals)}"
