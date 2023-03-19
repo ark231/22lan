@@ -5,10 +5,10 @@ import math
 import sympy
 from sympy.parsing import sympy_parser
 import re
-from pathlib import Path
+import json
 
 from . import common
-from .macro_resolver import MacroResolver
+from .macro_resolver import MacroResolver, retrieve_macros, as_macro, Macro
 
 
 class ExtensionResolver:
@@ -17,34 +17,27 @@ class ExtensionResolver:
         self.funcs = funcs
         self.code = common.Code()
         self.labels: dict[int, dict[str, int]] = {}
+        self.macros: dict[str, Macro] = {}
         if any([func["id"] < 0 for func in funcs.values()]):
             self.code = common.Code()
             self._resolve_autofuncs()
         else:
             with open(args.source, "r", encoding="utf-8") as infile:
                 self.code = common.Code(infile.read())
+
+        def decode_lib(dct):
+            result = as_macro(dct)
+            if isinstance(result, dict):
+                result = common.Code.as_code(result)
+            return result
+
         if self.args.external is not None:
             for external_funcinfo_file in self.args.external:
                 with open(external_funcinfo_file, "r", encoding="utf-8") as infile:
-                    reader = csv.reader(infile)
-                    header = next(reader)
-                    name_idx = header.index("name")
-                    type_idx = header.index("type")
-                    id_idx = header.index("id")
-                    for row in reader:
-                        if row == []:
-                            continue
-                        new_func = common.FuncBody()
-                        match row[type_idx]:
-                            case "raw":
-                                new_func["id"] = int(row[id_idx], 0)
-                            case "std":
-                                new_func["id"] = int(f"0b11{int(row[id_idx],0):b}", 2)
-                            case "usr":
-                                new_func["id"] = int(f"0b10{int(row[id_idx],0):b}", 2)
-                            case _:
-                                print(f"error: unknown functype '{row[type_idx]}' for func '{row[name_idx]}'")
-                        self.funcs[row[name_idx]] = new_func
+                    external = json.load(infile, object_hook=decode_lib)
+                for fname, fid in external["funcs"].items():
+                    self.funcs[fname] = common.FuncBody(id=fid, content="")
+                self.macros |= external["macros"]
 
     def _resolve_autofuncs(self) -> None:
         result = common.Code(self.funcs["!!top!!"]["content"])
@@ -308,7 +301,9 @@ class ExtensionResolver:
         self.code = result
 
     def resolve_macro(self) -> None:
-        resolver = MacroResolver(self.args, self.code)
+        macros, code = retrieve_macros(self.code)
+        self.macros |= macros
+        resolver = MacroResolver(self.args, code, self.macros)
         resolver.expand_macro()
         self.code = resolver.code
 

@@ -36,3 +36,15 @@ class Code:
         result._code = self._code + other._code
         result._indent = other._indent
         return result
+
+    @classmethod
+    def as_code(cls, dct):
+        if "__code__" in dct:
+            result = Code()
+            result._code = dct["code"]
+            result.set_indent(dct["indent"])
+            return result
+        return dct
+
+    def to_json_serializable(self):
+        return {"__code__": True, "code": self._code, "indent": self._indent}

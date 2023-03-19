@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
+import json
 import sys
 import argparse
 from pathlib import Path
 import csv
 import re
-from typing import cast, Final, ClassVar, TypedDict, NewType, TypeVar, Generic, Literal
+from typing import cast, Final, ClassVar, NewType
 import io
 from enum import Enum, auto
 from lark.lexer import Token
@@ -14,8 +15,14 @@ from langs import lan22_annotation, base
 from libs import common
 from libs.extension_resolver import ExtensionResolver
 from libs.function_declaration_resolver import FuncDeclarationSolver
+from libs.macro_resolver import retrieve_macros, from_macro, Macro
 
-SUFFIXES: Final[dict[str, str]] = {"22lan": ".22l", "funcinfo": ".ext.csv", "22lan_extended": ".22le"}
+SUFFIXES: Final[dict[str, str]] = {
+    "22lan": ".22l",
+    "funcinfo": ".ext.csv",
+    "22lan_extended": ".22le",
+    "22lan_extended_library": ".22libe",
+}
 
 
 class ExtendedAnnotationParser(lan22_annotation.AnnotationParser):
@@ -189,6 +196,49 @@ def emit_22lan_extended(args):
         outfile.write(resolver.code.as_str())
 
 
+def emit_22lan_extended_library(args):
+    with open(args.source, "r", encoding="utf8") as infile:
+        macros, _ = retrieve_macros(infile.read().splitlines())
+    funcs: dict[str, int] = {}
+    with open(args.funcinfo, "r", encoding="utf8") as infile:
+        reader = csv.reader(infile)
+        header = next(reader)
+        name_idx = header.index("name")
+        try:
+            type_idx = header.index("type")
+        except ValueError:
+            type_idx = None
+        id_idx = header.index("id")
+        for row in reader:
+            if row == []:
+                continue
+            func_name = row[name_idx]
+            if type_idx is None:
+                func_type = "raw"
+            else:
+                func_type = row[type_idx]
+            match func_type:
+                case "raw":
+                    func_id = int(row[id_idx], 0)
+                case "std":
+                    func_id = int(f"0b11{int(row[id_idx],0):b}", 2)
+                case "usr":
+                    func_id = int(f"0b10{int(row[id_idx],0):b}", 2)
+                case _:
+                    func_id = -1
+            funcs[func_name] = func_id
+
+    class LibEncoder(json.JSONEncoder):
+        def default(self, o):
+            if isinstance(o, common.Code):
+                return o.to_json_serializable
+            if isinstance(o, Macro):
+                return from_macro(o)
+
+    with open(args.output, "w", encoding="utf-8") as outfile:
+        json.dump({"macros": macros, "funcs": funcs}, outfile, cls=LibEncoder)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="resolve 22lan's function reference extention",
@@ -224,6 +274,8 @@ def main():
             emit_funcinfo(args)
         case "22lan_extended":
             emit_22lan_extended(args)
+        case "22lan_extended_library":
+            emit_22lan_extended_library(args)
 
 
 if __name__ == "__main__":

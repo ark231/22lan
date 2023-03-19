@@ -10,34 +10,47 @@ class Macro:
         self.code = common.Code()
 
 
+def as_macro(dct):
+    if "__macro__" in dct:
+        result = Macro(dct["argnames"])
+        result.code = dct["code"]
+        return result
+    return dct
+
+
+def from_macro(macro: Macro):
+    return {"__macro__": True, "argnames": macro.argnames, "code": macro.code}
+
+
+def retrieve_macros(code: common.Code | list[str]) -> tuple[dict[str, Macro], common.Code]:
+    current_macro_name = None
+    code_without_macro_definition = common.Code()
+    macros: dict[str, Macro] = {}
+    for line in code:
+        match = re.search(r"^ *#defmacro (?P<name>[a-zA-Z0-9_]+)( +(?P<argdecl>.+))?", line)
+        if match is not None:
+            current_macro_name = match["name"]
+            argnames = []
+            if match["argdecl"]:
+                try:
+                    argnames = list(range(int(match["argdecl"])))
+                except ValueError:
+                    argnames = [argname.strip(" ") for argname in match["argdecl"].split(",")]
+            macros[match["name"]] = Macro(argnames)
+        elif re.search(r"^ *#endmacro", line) is not None:
+            current_macro_name = None
+        elif current_macro_name is not None:
+            macros[current_macro_name].code.add_line(line)
+        else:
+            code_without_macro_definition.add_line(line)
+    return macros, code_without_macro_definition
+
+
 class MacroResolver:
-    def __init__(self, args, code: common.Code) -> None:
+    def __init__(self, args, code: common.Code, macros: dict[str, Macro]) -> None:
         self.args = args
         self.code = code
-        self.macros: dict[str, Macro] = {}
-        self._retrieve_macros()
-
-    def _retrieve_macros(self) -> None:
-        current_macro_name = None
-        code_without_macro_definition = common.Code()
-        for line in self.code:
-            match = re.search(r"^ *#defmacro (?P<name>[a-zA-Z0-9_]+)( +(?P<argdecl>.+))?", line)
-            if match is not None:
-                current_macro_name = match["name"]
-                argnames = []
-                if match["argdecl"]:
-                    try:
-                        argnames = list(range(int(match["argdecl"])))
-                    except ValueError:
-                        argnames = [argname.strip(" ") for argname in match["argdecl"].split(",")]
-                self.macros[match["name"]] = Macro(argnames)
-            elif re.search(r"^ *#endmacro", line) is not None:
-                current_macro_name = None
-            elif current_macro_name is not None:
-                self.macros[current_macro_name].code.add_line(line)
-            else:
-                code_without_macro_definition.add_line(line)
-        self.code = code_without_macro_definition
+        self.macros: dict[str, Macro] = macros
 
     def _expand_macro_recursive(self, code: common.Code) -> common.Code:
         result = common.Code()
