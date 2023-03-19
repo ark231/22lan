@@ -231,7 +231,7 @@ def emit_22lan_extended_library(args):
     class LibEncoder(json.JSONEncoder):
         def default(self, o):
             if isinstance(o, common.Code):
-                return o.to_json_serializable
+                return o.to_json_serializable()
             if isinstance(o, Macro):
                 return from_macro(o)
 
