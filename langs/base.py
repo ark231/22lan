@@ -74,12 +74,18 @@ class Stack:
 
 
 class BasicGeneratorFromLan22(BasicGenerator[Lan22Tree]):
-    initial_s1_base32: str
+    initial_stacks_base32: str
     compile_time_stack: Stack
+    initial_s0: bytes
+    initial_s1: bytes
+    initial_s2: bytes
 
     def __init__(self, debug_level=0) -> None:
         super().__init__(debug_level=debug_level)
-        self.initial_s1_base32 = ""
+        self.initial_stacks_base32 = ""
+        self.initial_s0 = b""
+        self.initial_s1 = b""
+        self.initial_s2 = b""
         self.compile_time_stack = Stack()
         self.functions = []
 
@@ -88,7 +94,7 @@ class BasicGeneratorFromLan22(BasicGenerator[Lan22Tree]):
         return int(node[0].value, 0)
 
     def BASE32(self, node: str):
-        self.initial_s1_base32 += node
+        self.initial_stacks_base32 += node
         return Discard
 
     def COMMENT(self, _: str):

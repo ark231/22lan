@@ -77,8 +77,12 @@ class CPlusPlusGenerator(base.BasicGeneratorFromLan22):
     def __repr__(self):
         return f"""
 CPlusPlusGenerator{{
-    initial_s1_size:{len(self.initial_s1_base32)}
-    initial_s1:{self.initial_s1_base32}
+    initial_s0_size:{len(self.initial_s0)}
+    initial_s0:{self.initial_s0}
+    initial_s1_size:{len(self.initial_s1)}
+    initial_s1:{self.initial_s1}
+    initial_s2_size:{len(self.initial_s2)}
+    initial_s2:{self.initial_s2}
 }}
         """
 
@@ -202,11 +206,21 @@ CPlusPlusGenerator{{
         for func in self.functions:
             lan22_initializer.add_step(f"ftable[{func.fid}]=&{func.name};")
 
-        if self.initial_s1_base32 != "":
-            for byte in reversed(
-                base64.b32decode(self.initial_s1_base32 + "=" * (8 - len(self.initial_s1_base32) % 8))
-            ):
-                lan22_initializer.add_step(f"s1.push({byte});")
+        if self.initial_stacks_base32 != "":
+            if self.initial_stacks_base32[0] != "\\":
+                self.initial_stacks_base32 = r"\1" + self.initial_stacks_base32
+            for initial_stack_base32 in self.initial_stacks_base32.split("\\"):
+                if initial_stack_base32 == "" or len(initial_stack_base32) < 2:
+                    continue
+                stack_id = "OI2".index(initial_stack_base32[0])
+                current_value = getattr(self, f"initial_s{stack_id}")
+                current_value += base64.b32decode(
+                    initial_stack_base32[1:] + "=" * (8 - len(initial_stack_base32[1:]) % 8)
+                )
+                setattr(self, f"initial_s{stack_id}", current_value)
+            for i in range(3):
+                for byte in reversed(getattr(self, f"initial_s{i}")):
+                    lan22_initializer.add_step(f"s{i}.push({byte});")
         lan22_initializer.add_step("r0 = 0;")
         lan22_initializer.add_step("r1 = 0;")
         lan22_initializer.add_step("r2 = 0;")

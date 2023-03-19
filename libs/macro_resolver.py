@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
+import re
+from base64 import b32encode
 
 from . import common
-import re
 
 
 class Macro:
@@ -46,6 +47,15 @@ def retrieve_macros(code: common.Code | list[str]) -> tuple[dict[str, Macro], co
     return macros, code_without_macro_definition
 
 
+def unescape(source: str) -> str:
+    source = re.sub(r"(?<!\\)\\n", "\n", source)
+    source = re.sub(r"(?<!\\)\\r", "\r", source)
+    source = re.sub(r"(?<!\\)\\t", "\t", source)
+    source = re.sub(r"(?<!\\)\\0", "\0", source)
+    source = re.sub(r"(?<!\\)\\\\", "\\\\", source)
+    return source
+
+
 class MacroResolver:
     def __init__(self, args, code: common.Code, macros: dict[str, Macro]) -> None:
         self.args = args
@@ -66,14 +76,31 @@ class MacroResolver:
                     result.set_indent(match["indent"])
                     result.add_line(f";debug: {line}")
                     result.set_indent("")
-                for macro_line in self.macros[match["name"]].code:
-                    for arg_placeholder in re.findall(r"#{(?P<name>[^}]+)}", macro_line):
-                        macro_line = re.sub(
-                            f"#{{{arg_placeholder}}}",
-                            f"{args[self.macros[match['name']].argnames.index(arg_placeholder)]}",
-                            macro_line,
-                        )
-                    result.add_line(macro_line)
+                match match["name"]:
+                    case "stack":
+                        stack_id = int(args[0])
+                        value_type = args[1]
+                        values = b""
+                        match value_type:
+                            case "raw":
+                                values = bytes(int(value, 0) for value in args[2:])
+                            case "cstr":
+                                values = unescape(",".join(args[2:])).encode("utf-8") + b"\0"
+                            case _:
+                                print(f'error: unknown value type "{value_type}"')
+                                result.add_line(f"!!!!!!!error!!!!!!! {line}")
+                        result.set_indent(match["indent"])
+                        result.add_line(rf"\{'OI2'[stack_id]}{b32encode(values).decode('utf-8').rstrip('=')}")
+                        result.set_indent("")
+                    case _:
+                        for macro_line in self.macros[match["name"]].code:
+                            for arg_placeholder in re.findall(r"#{(?P<name>[^}]+)}", macro_line):
+                                macro_line = re.sub(
+                                    f"#{{{arg_placeholder}}}",
+                                    f"{args[self.macros[match['name']].argnames.index(arg_placeholder)]}",
+                                    macro_line,
+                                )
+                            result.add_line(macro_line)
                 if self.args.debug:
                     result.set_indent(match["indent"])
                     result.add_line(";debug: end macro")
