@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 import re
 from base64 import b32encode
+from logging import getLogger
+
+logger = getLogger(__name__)
 
 from . import common
 
@@ -87,7 +90,7 @@ class MacroResolver:
                             case "cstr":
                                 values = unescape(",".join(args[2:])).encode("utf-8") + b"\0"
                             case _:
-                                print(f'error: unknown value type "{value_type}"')
+                                logger.error('unknown value type "%s"', value_type)
                                 result.add_line(f"!!!!!!!error!!!!!!! {line}")
                         result.set_indent(match["indent"])
                         result.add_line(rf"\{'OI2'[stack_id]}{b32encode(values).decode('utf-8').rstrip('=')}")

@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 import sys
 import csv
+from logging import getLogger
+
+logger = getLogger(__name__)
 
 from . import common
 
@@ -16,7 +19,7 @@ class FuncDeclarationSolver:
 
     def _resolve_funcdeclarations(self) -> None:
         if self.args.funcinfo is None:
-            print("error: no funcinfo file was supplied", file=sys.stderr)
+            logger.error("no funcinfo file was supplied")
             sys.exit(1)
         result = common.Code(self.funcs["!!top!!"]["content"])
         del self.funcs["!!top!!"]
@@ -40,14 +43,14 @@ class FuncDeclarationSolver:
                         case "std" | "usr":
                             result.add_line(rf";\autofunc {row[type_idx]}")
                         case _:
-                            print(f"error: unknown functype '{row[type_idx]}' for func '{row[name_idx]}'")
-                            print(rf"func_id from_annotation: {func['id']}, from funcinfo file: {row[id_idx]}")
+                            logger.error("unknown functype '%s' for func '%s'", row[type_idx], row[name_idx])
+                            logger.error("func_id from_annotation: %d, from funcinfo file: %d", func["id"], row[id_idx])
                             sys.exit(1)
                     result.add_lines(func["content"].splitlines())
                     funcnames_in_funcinfo.append(row[name_idx])
                 except KeyError:
-                    print(
-                        f"warn: func '{row[name_idx]} is in funcinfo file, but not in source code, thus not implemented'"
+                    logger.warning(
+                        "func '%s is in funcinfo file, but not in source code, thus not implemented'", row[name_idx]
                     )
                     match row[type_idx]:
                         case "std" | "usr":
@@ -55,8 +58,8 @@ class FuncDeclarationSolver:
                         case "raw":
                             result.add_line(rf";\func {int(row[id_idx],0):#b}")
                         case _:
-                            print(f"error: unknown functype '{row[type_idx]}' for func '{row[name_idx]}'")
-                            print(rf"func_id from funcinfo file: {row[id_idx]}")
+                            logger.error("unknown functype '%s' for func '%s'", row[type_idx], row[name_idx])
+                            logger.error("func_id from funcinfo file: %s", row[id_idx])
                             sys.exit(1)
                     if arg0_idx is None:
                         func_args = None
@@ -87,5 +90,5 @@ class FuncDeclarationSolver:
                     result.add_line("endfunc")
                     result.add_line("")
             for name in set(self.funcs) - set(funcnames_in_funcinfo):
-                print(f"warn: function '{name}' is in source code, but not in funcinfo file")
+                logger.waning("function '%s' is in source code, but not in funcinfo file", name)
         self.code = result

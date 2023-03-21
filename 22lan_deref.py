@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import json
+import toml
 import sys
 import argparse
 from pathlib import Path
@@ -10,6 +11,9 @@ from typing import cast, Final, ClassVar, NewType
 import io
 from enum import Enum, auto
 from lark.lexer import Token
+from logging import getLogger, config
+
+logger = getLogger(__name__)
 
 from langs import lan22_annotation, base
 from libs import common
@@ -170,9 +174,9 @@ def emit_22lan(args):
             continue
         check_result = check_implementation_exists(body)
         if check_result is None:
-            print(f"warn: mismatching startfunc and endfunc in function '{name}'")
-        elif check_result == False:
-            print(f"warn: function '{name}' doesn't have implementation")
+            logger.warning("mismatching startfunc and endfunc in function '%s'", name)
+        elif check_result is False:
+            logger.warning("function '%s' doesn't have implementation", name)
     resolver = ExtensionResolver(args, funcs)
 
     with open(args.output, "w", encoding="utf-8") as outfile:
@@ -187,9 +191,9 @@ def emit_22lan_extended(args):
             continue
         check_result = check_implementation_exists(body)
         if check_result is None:
-            print(f"warn: mismatching startfunc and endfunc in function '{name}'")
-        elif check_result == False:
-            print(f"warn: function '{name}' doesn't have implementation")
+            logger.warning("mismatching startfunc and endfunc in function '%s'", name)
+        elif check_result is False:
+            logger.warning("function '%s' doesn't have implementation", name)
     resolver = FuncDeclarationSolver(args, funcs)
 
     with open(args.output, "w", encoding="utf-8") as outfile:
@@ -279,4 +283,5 @@ def main():
 
 
 if __name__ == "__main__":
+    config.dictConfig(toml.load(Path(__file__).parent / "log_config.toml"))
     main()

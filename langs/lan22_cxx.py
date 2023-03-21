@@ -7,6 +7,10 @@ from pathlib import Path
 import re
 from . import base
 
+from logging import getLogger
+
+logger = getLogger(__name__)
+
 
 class Label:
     def __init__(self, lid: int):
@@ -296,7 +300,7 @@ def main() -> None:
     try:
         generator.from_tree(parsed_data)
     except base.ParseError as e:
-        print(sys.stderr, f"parse error at {args.source}:{e.linenum} info:{e}")
+        logger.error("parse error at %s:%d info:%s", args.source, e.linenum, e)
 
     if args.debug:
         print(generator)

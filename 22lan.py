@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 import argparse
 from pathlib import Path
-import sys
 from langs import lan22_nyulan, lan22_cxx, lan22_annotation, base
 from typing import Final
+from logging import getLogger, config
+import toml
+
+logger = getLogger(__name__)
 
 SUFFIXES: Final[dict[str, str]] = {"nyulan": ".nyu", "cxx": ".cpp", "annotation": ".csv"}
 
@@ -41,7 +44,7 @@ def main() -> None:
     try:
         generator.from_tree(parsed_data)
     except base.ParseError as e:
-        print(sys.stderr, f"parse error at {args.source}:{e.linenum} info:{e}")
+        logger.error("parse error at %s:%d info:%s", args.source, e.linenum, e)
 
     if args.debug >= 1:
         print(generator)
@@ -51,4 +54,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    config.dictConfig(toml.load(Path(__file__).parent / "log_config.toml"))
     main()

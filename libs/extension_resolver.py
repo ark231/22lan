@@ -6,6 +6,9 @@ import sympy
 from sympy.parsing import sympy_parser
 import re
 import json
+from logging import getLogger
+
+logger = getLogger(__name__)
 
 from . import common
 from .macro_resolver import MacroResolver, retrieve_macros, as_macro, Macro
@@ -67,14 +70,14 @@ class ExtensionResolver:
                             result.add_line(rf";\func 0b10{int(row[id_idx],0):b}")
                             self.funcs[row[name_idx]]["id"] = int(f"0b10{int(row[id_idx],0):b}", 2)
                         case _:
-                            print(f"error: unknown functype '{row[type_idx]}' for func '{row[name_idx]}'")
-                            print(rf"func_id from_annotation: {func['id']}, from funcinfo file: {row[id_idx]}")
+                            logger.error("unknown functype '%s' for func '%s'", row[type_idx], row[name_idx])
+                            logger.error("func_id from_annotation: %d, from funcinfo file: %d", func["id"], row[id_idx])
                             sys.exit(1)
                     result.add_lines(func["content"].splitlines())
                     funcnames_in_funcinfo.append(row[name_idx])
                 except KeyError:
-                    print(
-                        f"warn: func '{row[name_idx]} is in funcinfo file, but not in source code, thus not implemented'"
+                    logger.warning(
+                        "func '%s is in funcinfo file, but not in source code, thus not implemented'", row[name_idx]
                     )
                     match row[type_idx]:
                         case "std":
@@ -84,8 +87,8 @@ class ExtensionResolver:
                         case "raw":
                             full_id = int(row[id_idx], 0)
                         case _:
-                            print(f"error: unknown functype '{row[type_idx]}' for func '{row[name_idx]}'")
-                            print(rf"func_id from funcinfo file: {row[id_idx]}")
+                            logger.error("unknown functype '%s' for func '%s'", row[type_idx], row[name_idx])
+                            logger.error("from funcinfo file: %d", row[id_idx])
                             sys.exit(1)
                     result.add_line(rf";\func {full_id:#b}")
                     if arg0_idx is None:
@@ -112,7 +115,7 @@ class ExtensionResolver:
                     result.add_line(";TODO: implement this function")
                     self.funcs[row[name_idx]] = common.FuncBody(id=full_id, content="")
             for name in set(self.funcs) - set(funcnames_in_funcinfo):
-                print(f"warn: function '{name}' is in source code, but not in funcinfo file")
+                logger.warning("function '%s' is in source code, but not in funcinfo file", name)
         self.code = result
 
     def _mangle_label(self, func_index: int, name: str):
@@ -152,7 +155,7 @@ class ExtensionResolver:
             elif pseudo_match["pseudo_op"] == "autolabel":
                 labelname_match = re.search(r"(?P<name>[a-zA-Z0-9_]+)", pseudo_match["pseudo_arg"])
                 if labelname_match is None:
-                    print("error: no labelname at autolabel pseudo_op")
+                    logger.error("no labelname at autolabel pseudo_op")
                     result.add_line(f"!!!!!!!error!!!!!!! {line}")
                     continue
                 result.add_line(f"${{{current_autolabel_id}}}")
@@ -166,7 +169,7 @@ class ExtensionResolver:
                     expr = re.sub(f"l{{{labelname}}}", self._mangle_label(current_func_index, labelname), expr)
                 result.add_line(f"%autopushltor0 {expr}")
             else:
-                print(f'error: unknown pseudo operation "{pseudo_match["pseudo_op"]}"')
+                logger.error('unknown pseudo operation "%s"', pseudo_match["pseudo_op"])
                 result.add_line(f"!!!!!!!error!!!!!!! '{line}'")
             if self.args.debug:
                 result.add_line(";debug: end pseudo operation")
@@ -227,7 +230,7 @@ class ExtensionResolver:
                 if size >= 2:
                     result.add_line("xchg13")  # restore r1 from r3
             else:
-                print(f'error: unknown dependant pseudo operation "{pseudo_match["pseudo_op"]}"')
+                logger.error('unknown dependant pseudo operation "%s"', pseudo_match["pseudo_op"])
                 result.add_line(f"!!!!!!!error!!!!!!! '{line}'")
             result.set_indent("")
         self.code = result
@@ -289,7 +292,7 @@ class ExtensionResolver:
             if value >= 0:
                 binary = f"{value:b}"
                 if len(binary) > bitwidth:
-                    print(f"error: number {value} cannot be expressed with {bitwidth} bit unsigned integer")
+                    logger.error("number %d cannot be expressed with %d bit unsigned integer", value, bitwidth)
                     result.add_line(f"!!!!!!!error!!!!!!! {line}")
                 else:
                     for digit in binary:

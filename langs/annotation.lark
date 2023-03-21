@@ -1,6 +1,6 @@
 FUNC_ID: /0b[01]+/
 FUNC_NAME.-1: /[a-zA-Z0-9_]+/
-TYPE: /[rs][0123]_[0-9]+/
+TYPE: /[rs][0123]_[0-9]+[n]?/
 REGISTER.1: /r[0123]/
 CONST: "const"
 INVALIDATED: "invalidated"
