@@ -79,7 +79,13 @@ class FuncDeclarationSolver:
                     result.add_line(
                         rf";\@{row[name_idx]} {stringize_typelist(func_args)} -> {stringize_typelist(retvals)}"
                     )
+                    result.add_line("startfunc")
+                    result.set_indent("    ")
                     result.add_line(";TODO: implement this function")
+                    result.add_line(f"@{{{row[name_idx]}}}")
+                    result.set_indent("")
+                    result.add_line("endfunc")
+                    result.add_line("")
             for name in set(self.funcs) - set(funcnames_in_funcinfo):
                 print(f"warn: function '{name}' is in source code, but not in funcinfo file")
         self.code = result
