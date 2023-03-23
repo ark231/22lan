@@ -41,7 +41,7 @@ class FuncDeclarationSolver:
                         case "raw":
                             result.add_line(rf";\func {int(row[id_idx],0):#b}")
                         case "std" | "usr":
-                            result.add_line(rf";\autofunc {row[type_idx]}")
+                            result.add_line(r";\autofunc")
                         case _:
                             logger.error("unknown functype '%s' for func '%s'", row[type_idx], row[name_idx])
                             logger.error("func_id from_annotation: %d, from funcinfo file: %d", func["id"], row[id_idx])
@@ -54,7 +54,7 @@ class FuncDeclarationSolver:
                     )
                     match row[type_idx]:
                         case "std" | "usr":
-                            result.add_line(rf";\autofunc {row[type_idx]}")
+                            result.add_line(r";\autofunc")
                         case "raw":
                             result.add_line(rf";\func {int(row[id_idx],0):#b}")
                         case _:

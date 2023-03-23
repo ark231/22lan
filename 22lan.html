@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+	
+	<meta http-equiv="content-type" content="text/html; charset=utf-8"/>
+	<title></title>
+	<meta name="generator" content="LibreOffice 7.5.1.2 (Linux)"/>
+	<meta name="created" content="00:00:00"/>
+	<meta name="changed" content="2023-03-22T07:35:34.849672112"/>
+	
+	<style type="text/css">
+		body,div,table,thead,tbody,tfoot,tr,th,td,p { font-family:"Linux Libertine G"; font-size:x-small }
+		a.comment-indicator:hover + comment { background:#ffd; position:absolute; display:block; border:1px solid black; padding:0.5em;  } 
+		a.comment-indicator { background:red; display:inline-block; border:1px solid black; width:0.5em; height:0.5em;  } 
+		comment { display:none;  } 
+	</style>
+	
+</head>
+
+<body>
+<table cellspacing="0" border="0">
+	<colgroup span="5" width="187"></colgroup>
+	<tr>
+		<td height="37" align="left" valign=bottom><font color="#000000"><br></font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">in0</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">in1</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">out</font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+	</tr>
+	<tr>
+		<td height="37" align="left" valign=bottom><font face="Arial" color="#000000">nand</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">r0_64</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">r1_64</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">r2_64</font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+	</tr>
+	<tr>
+		<td height="37" align="left" valign=bottom><font face="Arial" color="#000000">lshift</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">r0_64</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">r1_8</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">r2_64</font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+	</tr>
+	<tr>
+		<td height="37" align="left" valign=bottom><font face="Arial" color="#000000">push8s0</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">r0_8</font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">s0_8</font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+	</tr>
+	<tr>
+		<td height="37" align="left" valign=bottom><font face="Arial" color="#000000">pop8s0</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">s0_8</font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">r0_8</font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+	</tr>
+	<tr>
+		<td height="37" align="left" valign=bottom><font face="Arial" color="#000000">push8s1</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">r1_8</font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">s1_8</font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+	</tr>
+	<tr>
+		<td height="37" align="left" valign=bottom><font face="Arial" color="#000000">pop8s1</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">s1_8</font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">r1_8</font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+	</tr>
+	<tr>
+		<td height="37" align="left" valign=bottom><font face="Arial" color="#000000">push8s2</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">r2_8</font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">s2_8</font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+	</tr>
+	<tr>
+		<td height="37" align="left" valign=bottom><font face="Arial" color="#000000">pop8s2</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">s2_8</font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">r2_8</font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+	</tr>
+	<tr>
+		<td height="37" align="left" valign=bottom><font face="Arial" color="#000000">call</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">cs_64</font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+	</tr>
+	<tr>
+		<td height="37" align="left" valign=bottom><font face="Arial" color="#000000">print</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">r0_8</font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+	</tr>
+	<tr>
+		<td height="37" align="left" valign=bottom><font face="Arial" color="#000000">read</font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">r0_8</font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+	</tr>
+	<tr>
+		<td height="37" align="left" valign=bottom><font face="Arial" color="#000000">exit</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">r0_8</font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+	</tr>
+	<tr>
+		<td height="37" align="left" valign=bottom><font face="Arial" color="#000000">startfunc</font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+	</tr>
+	<tr>
+		<td height="37" align="left" valign=bottom><font face="Arial" color="#000000">endfunc</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">cs_64</font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+	</tr>
+	<tr>
+		<td height="37" align="left" valign=bottom><font face="Arial" color="#000000">deflabel</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">cs_64</font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+	</tr>
+	<tr>
+		<td height="37" align="left" valign=bottom><font face="Arial" color="#000000">xchg03</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">r0_64</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">r3_64</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">r3_64</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">r0_64</font></td>
+	</tr>
+	<tr>
+		<td height="37" align="left" valign=bottom><font face="Arial" color="#000000">xchg13</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">r1_64</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">r3_64</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">r3_64</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">r1_64</font></td>
+	</tr>
+	<tr>
+		<td height="37" align="left" valign=bottom><font face="Arial" color="#000000">xchg23</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">r2_64</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">r3_64</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">r3_64</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">r2_64</font></td>
+	</tr>
+	<tr>
+		<td height="37" align="left" valign=bottom><font face="Arial" color="#000000">zero</font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">cs_1</font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+	</tr>
+	<tr>
+		<td height="37" align="left" valign=bottom><font face="Arial" color="#000000">one</font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">cs_1</font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+	</tr>
+	<tr>
+		<td height="42" align="left" valign=bottom><font face="Arial" color="#000000">ifz</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">cs_64</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">r1_64</font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+	</tr>
+	<tr>
+		<td height="37" align="left" valign=bottom><font face="Arial" color="#000000">pushl8</font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">cs_8</font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+		<td align="left" valign=bottom><font face="Arial" color="#000000">s0_8</font></td>
+		<td align="left" valign=bottom><font color="#000000"><br></font></td>
+	</tr>
+</table>
+<!-- ************************************************************************** -->
+</body>
+
+</html>

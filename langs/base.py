@@ -6,6 +6,7 @@ from lark.lexer import Token
 from lark.lark import Lark
 from pathlib import Path
 from typing import NewType, ClassVar, TypeVar, Generic, cast
+import base64
 
 
 class ParseError(Exception):
@@ -99,3 +100,44 @@ class BasicGeneratorFromLan22(BasicGenerator[Lan22Tree]):
 
     def COMMENT(self, _: str):
         return Discard
+
+    def _decompress_base32(self, b32str: str) -> str:
+        result = ""
+        prev_char = ""
+        is_escaped = False
+        is_repeat = False
+        repeat = ""
+        for char in b32str:
+            if char == "\\":
+                is_escaped = True
+            elif is_escaped:
+                if char in "OI2":
+                    result += rf"\{char}"
+                else:
+                    if char == "S":
+                        is_repeat = True
+                    elif char == "E":
+                        is_repeat = False
+                        result += prev_char * (int(repeat.translate(str.maketrans("OI", "01")), 8) - 1)
+                        repeat = ""
+                    else:
+                        result += rf"\{char}"
+                is_escaped = False
+            elif is_repeat:
+                repeat += char
+            else:
+                prev_char = char
+                result += char
+        return result
+
+    def _decode_stack_initializer(self):
+        if self.initial_stacks_base32[0] != "\\":
+            self.initial_stacks_base32 = r"\1" + self.initial_stacks_base32
+        self.initial_stacks_base32 = self._decompress_base32(self.initial_stacks_base32)
+        for initial_stack_base32 in self.initial_stacks_base32.split("\\"):
+            if initial_stack_base32 == "" or len(initial_stack_base32) < 2:
+                continue
+            stack_id = "OI2".index(initial_stack_base32[0])
+            current_value = getattr(self, f"initial_s{stack_id}")
+            current_value += base64.b32decode(initial_stack_base32[1:] + "=" * (8 - len(initial_stack_base32[1:]) % 8))
+            setattr(self, f"initial_s{stack_id}", current_value)

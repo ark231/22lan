@@ -168,6 +168,12 @@ class ExtensionResolver:
                 for labelname in set(re.findall(reflabel_pattern, expr)):
                     expr = re.sub(f"l{{{labelname}}}", self._mangle_label(current_func_index, labelname), expr)
                 result.add_line(f"%autopushltor0 {expr}")
+            elif pseudo_match["pseudo_op"] == "autoliteral":
+                reflabel_pattern = r"l{(?P<name>[a-zA-Z0-9_]+)}"
+                expr = pseudo_match["pseudo_arg"]
+                for labelname in set(re.findall(reflabel_pattern, expr)):
+                    expr = re.sub(f"l{{{labelname}}}", self._mangle_label(current_func_index, labelname), expr)
+                result.add_line(f"%autoliteral {expr}")
             else:
                 logger.error('unknown pseudo operation "%s"', pseudo_match["pseudo_op"])
                 result.add_line(f"!!!!!!!error!!!!!!! '{line}'")
@@ -229,6 +235,9 @@ class ExtensionResolver:
                     result.add_line("pop8s0")
                 if size >= 2:
                     result.add_line("xchg13")  # restore r1 from r3
+            elif pseudo_match["pseudo_op"] == "autoliteral":
+                value = self.eval(pseudo_match["pseudo_arg"])
+                result.add_line(f"${{{value}}}")
             else:
                 logger.error('unknown dependant pseudo operation "%s"', pseudo_match["pseudo_op"])
                 result.add_line(f"!!!!!!!error!!!!!!! '{line}'")

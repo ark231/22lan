@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 import argparse
 from lark.visitors import Discard, v_args
-import base64
-import sys
 from pathlib import Path
 import re
+from typing import cast
 from . import base
 
 from logging import getLogger
@@ -211,20 +210,24 @@ CPlusPlusGenerator{{
             lan22_initializer.add_step(f"ftable[{func.fid}]=&{func.name};")
 
         if self.initial_stacks_base32 != "":
-            if self.initial_stacks_base32[0] != "\\":
-                self.initial_stacks_base32 = r"\1" + self.initial_stacks_base32
-            for initial_stack_base32 in self.initial_stacks_base32.split("\\"):
-                if initial_stack_base32 == "" or len(initial_stack_base32) < 2:
-                    continue
-                stack_id = "OI2".index(initial_stack_base32[0])
-                current_value = getattr(self, f"initial_s{stack_id}")
-                current_value += base64.b32decode(
-                    initial_stack_base32[1:] + "=" * (8 - len(initial_stack_base32[1:]) % 8)
-                )
-                setattr(self, f"initial_s{stack_id}", current_value)
+            self._decode_stack_initializer()
             for i in range(3):
-                for byte in reversed(getattr(self, f"initial_s{i}")):
-                    lan22_initializer.add_step(f"s{i}.push({byte});")
+                prev_byte = -1
+                count = 0
+                for byte in list(reversed(getattr(self, f"initial_s{i}"))) + [-1]:
+                    if byte != prev_byte:
+                        if prev_byte != -1:
+                            if count > 6:
+                                lan22_initializer.add_step(f"for(auto i=0;i<{count};i++){{")
+                                lan22_initializer.add_step(f"    s{i}.push({prev_byte});")
+                                lan22_initializer.add_step("}")
+                            else:
+                                for _ in range(count):
+                                    lan22_initializer.add_step(f"s{i}.push({prev_byte});")
+                        prev_byte = byte
+                        count = 1
+                    else:
+                        count += 1
         lan22_initializer.add_step("r0 = 0;")
         lan22_initializer.add_step("r1 = 0;")
         lan22_initializer.add_step("r2 = 0;")

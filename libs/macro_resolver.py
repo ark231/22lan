@@ -65,6 +65,25 @@ class MacroResolver:
         self.code = code
         self.macros: dict[str, Macro] = macros
 
+    def _encode_stack_initializer(self, initial_values: bytes) -> str:
+        raw_result = b32encode(initial_values).decode("utf-8").rstrip("=")
+        prev_char = ""
+        count = 0
+        result = ""
+        for char in raw_result + "\0":  # \0はb32encodeの結果に現れない文字であるため、最後の文字を強制出力させるのにふさわしい
+            if char != prev_char:
+                if prev_char != "":
+                    if count > 6:
+                        result += rf"{prev_char}\S{count:o}\E"
+                    else:
+                        result += f"{prev_char*count}"
+                prev_char = char
+                count = 1
+            else:
+                count += 1
+        result = result.translate(str.maketrans("01", "OI"))
+        return result
+
     def _expand_macro_recursive(self, code: common.Code) -> common.Code:
         result = common.Code()
         macro_found = False
@@ -89,18 +108,43 @@ class MacroResolver:
                                 values = bytes(int(value, 0) for value in args[2:])
                             case "cstr":
                                 values = unescape(",".join(args[2:])).encode("utf-8") + b"\0"
+                            case "intarray":
+                                alignment = int(args[2])
+                                match args[3].lower():
+                                    case "little":
+                                        byteorder = "little"
+                                    case "big":
+                                        byteorder = "big"
+                                    case _:
+                                        logger.error("unknown byteorder %s", args[3])
+                                        result.add_line(f"!!!!!!!error!!!!!!! {line}")
+                                        continue
+                                values = b""
+                                for raw_value in args[4:]:
+                                    value_match = re.search(r"(?P<value>\d+):(?P<repeat>\d+)", raw_value)
+                                    if value_match:
+                                        value = int(value_match["value"], 0)
+                                        repeat = int(value_match["repeat"], 0)
+                                    else:
+                                        value = int(raw_value, 0)
+                                        repeat = 1
+                                    values += value.to_bytes(alignment // 8, byteorder) * repeat
                             case _:
                                 logger.error('unknown value type "%s"', value_type)
                                 result.add_line(f"!!!!!!!error!!!!!!! {line}")
                         result.set_indent(match["indent"])
-                        result.add_line(rf"\{'OI2'[stack_id]}{b32encode(values).decode('utf-8').rstrip('=')}")
+                        result.add_line(rf"\{'OI2'[stack_id]}{self._encode_stack_initializer(values)}")
                         result.set_indent("")
                     case _:
                         for macro_line in self.macros[match["name"]].code:
                             for arg_placeholder in re.findall(r"#{(?P<name>[^}]+)}", macro_line):
+                                if arg_placeholder == "__VA_ARGS__":
+                                    actual_args = args[self.macros[match["name"]].argnames.index("...") :]
+                                else:
+                                    actual_args = [args[self.macros[match["name"]].argnames.index(arg_placeholder)]]
                                 macro_line = re.sub(
                                     f"#{{{arg_placeholder}}}",
-                                    f"{args[self.macros[match['name']].argnames.index(arg_placeholder)]}",
+                                    f"{','.join(actual_args)}",
                                     macro_line,
                                 )
                             result.add_line(macro_line)
