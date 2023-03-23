@@ -55,24 +55,21 @@ class Function:
         if self.debug_level >= 3:
             result += f'    std::cerr<<";start {self.name}"<<std::endl;\n'
         for step in self.steps:
-            match = re.match(f"( *){GOTO}", step)
+            match = re.match(f"(?P<indent> *){GOTO} (?P<label_id>[0-9]+)", step)
             if match:
-                lines = []
-                lines.append(f"    {match[1]}switch(r0){{\n")
+                label_id = int(match["label_id"])
                 for label in self.labels:
-                    lines.append(f"    {match[1]}    case {label.lid}:goto {label.name};break;\n")
-                lines.append(
-                    f'    {match[1]}    default:{{std::cerr<<"invalid label id "<<r0<<std::endl;std::exit(1);}}\n'
-                )
-                lines.append(f"    {match[1]}}}\n")
-                for line in lines:
-                    result += line
+                    if label.lid == label_id:
+                        result += f"    {match['indent']}goto {label.name};\n"
             else:
                 result += f"    {step}\n"
         if self.debug_level >= 3:
             result += f'    std::cerr<<";end {self.name}"<<std::endl;\n'
         result += "}"
         return result
+
+    def forward_declaration(self) -> str:
+        return f"{self.rettype} {self.name}();"
 
 
 class CPlusPlusGenerator(base.BasicGeneratorFromLan22):
@@ -161,7 +158,8 @@ CPlusPlusGenerator{{
                 self.functions[-1].add_step("s2.pop();")
             elif instruction == "call":
                 self._debug_comment_instruction(instruction)
-                self.functions[-1].add_step("ftable[r0]();")
+                fid = self.compile_time_stack.pop64()
+                self.functions[-1].add_step(f"f{fid:b}();")
             elif instruction == "print":
                 self._debug_comment_instruction(instruction)
                 self.functions[-1].add_step("std::cout.put(r0 & 0xff);")
@@ -187,8 +185,8 @@ CPlusPlusGenerator{{
             elif instruction == "ifz":
                 self._debug_comment_instruction(instruction)
                 self.functions[-1].add_step("if(r1 == 0){")
-                # self.functions[-1].add_step("    goto *ltable[r0];")
-                self.functions[-1].add_step(f"    {GOTO}")
+                label_id = self.compile_time_stack.pop64()
+                self.functions[-1].add_step(f"    {GOTO} {label_id};")
                 self.functions[-1].add_step("}")
             elif instruction == "pushl8":
                 self._debug_comment_instruction(instruction)
@@ -207,8 +205,6 @@ CPlusPlusGenerator{{
 
     def start(self, _):
         lan22_initializer = Function("init", debug_level=self.debug_level)
-        for func in self.functions:
-            lan22_initializer.add_step(f"ftable[{func.fid}]=&{func.name};")
 
         if self.initial_stacks_base32 != "":
             if self.initial_stacks_base32[0] != "\\":
@@ -234,20 +230,17 @@ CPlusPlusGenerator{{
         entrypoint = Function("main", "int", debug_level=self.debug_level)
         self.functions.append(entrypoint)
         entrypoint.add_step("lan22::init();")
-        entrypoint.add_step("lan22::ftable[0]();")
+        entrypoint.add_step("lan22::f0();")
         return Discard
 
     def dumps(self) -> str:
         result = """
 #include<iostream>
-#include<unordered_map>
 #include<stack>
-#include<functional>
 
 namespace lan22{
 std::uint64_t r0,r1,r2,r3;
 std::stack<std::uint8_t> s0,s1,s2;
-std::unordered_map<std::uint64_t,std::function<void(void)>> ftable;
         """.strip(
             "\n"
         ).rstrip(
@@ -273,6 +266,8 @@ std::ostream& operator<<(std::ostream& stream,std::stack<std::uint8_t> value){
             ).rstrip(
                 " "
             )
+        for func in self.functions:
+            result += func.forward_declaration() + "\n"
         cxx_main = Function()
         for func in self.functions:
             if func.name == "main":
