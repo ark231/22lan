@@ -98,9 +98,13 @@ class MacroResolver:
                     case _:
                         for macro_line in self.macros[match["name"]].code:
                             for arg_placeholder in re.findall(r"#{(?P<name>[^}]+)}", macro_line):
+                                if arg_placeholder == "__VA_ARGS__":
+                                    actual_args = args[self.macros[match["name"]].argnames.index("...") :]
+                                else:
+                                    actual_args = [args[self.macros[match["name"]].argnames.index(arg_placeholder)]]
                                 macro_line = re.sub(
                                     f"#{{{arg_placeholder}}}",
-                                    f"{args[self.macros[match['name']].argnames.index(arg_placeholder)]}",
+                                    f"{','.join(actual_args)}",
                                     macro_line,
                                 )
                             result.add_line(macro_line)
