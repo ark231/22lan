@@ -146,7 +146,9 @@ def split_funcs(args) -> dict[str, common.FuncBody]:
     for line in escaped.splitlines(keepends=True):
         if re.search(";.*", line) is not None:
             distinguisher = AnnotationDistinguisher()
-            distinguisher.from_tree(ExtendedAnnotationParser.parse(line.replace("\n", "")))
+            distinguisher.from_tree(
+                ExtendedAnnotationParser.parse(re.sub(r"[^;]*(;.*)", r"\1", line).replace("\n", ""))
+            )
             if distinguisher.type == AnnotationType.deffunc:
                 current_name = "!!new!!"
                 funcs[current_name] = common.FuncBody(id=cast(int, distinguisher.info["id"]), content="")
