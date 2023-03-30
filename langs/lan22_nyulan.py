@@ -113,7 +113,7 @@ NyulanGenerator{{
 }}
         """
 
-    def __init__(self, debug_level=0):
+    def __init__(self, debug_level=0, backend_specific_args=None):
         super().__init__(debug_level=debug_level)
         self.functions = []
 

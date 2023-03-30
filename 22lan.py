@@ -17,6 +17,7 @@ def main() -> None:
     parser.add_argument("-o", "--output", help="output filename (in result folder)")
     parser.add_argument("-l", "--lang", help="output language", choices=SUFFIXES.keys(), default="nyulan")
     parser.add_argument("-d", "--debug", help="enable debug output", type=int, default=0)
+    parser.add_argument("--Xbackend", action="append", help="similar to gcc's -Xlinker")
     args = parser.parse_args()
 
     if args.output is None:
@@ -40,7 +41,7 @@ def main() -> None:
             concatenated_source += "\n"
 
     parsed_data = base.Lan22Parser.parse(concatenated_source)
-    generator = Generator(debug_level=args.debug)
+    generator = Generator(debug_level=args.debug, backend_specific_args=args.Xbackend)
     try:
         generator.from_tree(parsed_data)
     except base.ParseError as e:

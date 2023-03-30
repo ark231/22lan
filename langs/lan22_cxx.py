@@ -24,7 +24,7 @@ GOTO = "__GOTO__"
 
 
 class Function:
-    def __init__(self, name="", rettype="void", fid=None, debug_level=0):
+    def __init__(self, name="", rettype="void", fid=None, debug_level=0, enable_gnu_extension=False):
         self.name: str = name
         self.steps: list[str] = []
         self.labels: list[Label] = []
@@ -33,6 +33,7 @@ class Function:
         if fid is not None:
             self.add_fid(fid)
         self.debug_level = debug_level
+        self.enable_gnu_extension = enable_gnu_extension
 
     def add_step(self, step: str):
         self.steps.append(step)
@@ -47,10 +48,10 @@ class Function:
     def __str__(self) -> str:
         result = ""
         result += f"{self.rettype} {self.name}(){{\n"
-        # if self.fid is not None:
-        #     result += "    std::unordered_map<std::uint64_t,void*> ltable;\n"
-        #     for label in self.labels:
-        #         result += f"    ltable[{label.lid}]=&&{label.name};\n"
+        if self.enable_gnu_extension and self.fid is not None:
+            result += "    std::unordered_map<std::uint64_t,void*> ltable;\n"
+            for label in self.labels:
+                result += f"    ltable[{label.lid}]=&&{label.name};\n"
         if self.debug_level >= 3:
             result += f'    std::cerr<<";start {self.name}"<<std::endl;\n'
         for step in self.steps:
@@ -89,9 +90,14 @@ CPlusPlusGenerator{{
 }}
         """
 
-    def __init__(self, debug_level=0):
+    def __init__(self, debug_level=0, backend_specific_args=None):
         super().__init__(debug_level=debug_level)
         self.functions = []
+        self.enable_gnu_extension = False
+        if backend_specific_args is not None:
+            for arg in backend_specific_args:
+                if arg == "gnu-extension":
+                    self.enable_gnu_extension = True
 
     def _debug_comment_instruction(self, instruction: str):
         if self.debug_level >= 2:
@@ -171,7 +177,9 @@ CPlusPlusGenerator{{
                 self._debug_comment_instruction(instruction)
                 self.functions[-1].add_step("std::exit(r0);")
             elif instruction == "startfunc":
-                self.functions.append(Function(debug_level=self.debug_level))
+                self.functions.append(
+                    Function(debug_level=self.debug_level, enable_gnu_extension=self.enable_gnu_extension)
+                )
             elif instruction == "endfunc":
                 self.functions[-1].add_fid(self.compile_time_stack.pop64())
             elif instruction == "deflabel":
@@ -186,8 +194,8 @@ CPlusPlusGenerator{{
             elif instruction == "ifz":
                 self._debug_comment_instruction(instruction)
                 self.functions[-1].add_step("if(r1 == 0){")
-                # self.functions[-1].add_step("    goto *ltable[r0];")
-                self.functions[-1].add_step(f"    {GOTO}")
+                if self.enable_gnu_extension:
+                    self.functions[-1].add_step("    goto *ltable[r0];")
                 self.functions[-1].add_step("}")
             elif instruction == "pushl8":
                 self._debug_comment_instruction(instruction)
@@ -245,12 +253,12 @@ CPlusPlusGenerator{{
 #include<iostream>
 #include<unordered_map>
 #include<stack>
-#include<functional>
 
 namespace lan22{
 std::uint64_t r0,r1,r2,r3;
 std::stack<std::uint8_t> s0,s1,s2;
-std::unordered_map<std::uint64_t,std::function<void(void)>> ftable;
+using Function=void(void);
+std::unordered_map<std::uint64_t,Function*> ftable;
         """.strip(
             "\n"
         ).rstrip(
@@ -292,6 +300,7 @@ def main() -> None:
     parser.add_argument("-s", "--source", help="source file", required=True)
     parser.add_argument("-o", "--output", help="output filename (in result folder)")
     parser.add_argument("-d", "--debug", action="store_true", help="enable debug output")
+    parser.add_argument("--gnu-extension", action="store_true", help="enable gnu extension (taking address of a label)")
     args = parser.parse_args()
 
     if args.output is None:

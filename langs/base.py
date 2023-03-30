@@ -19,7 +19,7 @@ ParsedTree = TypeVar("ParsedTree", bound=Tree)
 
 
 class BasicGenerator(Transformer, Generic[ParsedTree]):
-    def __init__(self, debug_level=0):
+    def __init__(self, debug_level=0, backend_specific_args=None):
         super().__init__()
         self.debug_level = debug_level
 
@@ -81,7 +81,7 @@ class BasicGeneratorFromLan22(BasicGenerator[Lan22Tree]):
     initial_s1: bytes
     initial_s2: bytes
 
-    def __init__(self, debug_level=0) -> None:
+    def __init__(self, debug_level=0, backend_specific_args=None) -> None:
         super().__init__(debug_level=debug_level)
         self.initial_stacks_base32 = ""
         self.initial_s0 = b""
