@@ -33,8 +33,7 @@ class ExtendedAnnotationParser(lan22_annotation.AnnotationParser):
     larkfile: ClassVar[Path] = Path(__file__).parent / "langs" / "extended_annotation.lark"
 
 
-AUTOFUNC_STD_PATTERN = r";\\autofunc +std"
-AUTOFUNC_USR_PATTERN = r";\\autofunc +usr"
+AUTOFUNC_PATTERN = r";\\autofunc"
 
 
 def escape_extensions(filename: str, funcref=True, autofunc=True, pseudo_ops=True, macro=True) -> str:
@@ -45,8 +44,7 @@ def escape_extensions(filename: str, funcref=True, autofunc=True, pseudo_ops=Tru
             if funcref:
                 line = re.sub("(@{(?P<func_name>[a-zA-Z0-9_]+)})", r";\1", line)
             if autofunc:
-                line = re.sub(AUTOFUNC_STD_PATTERN, r";\\func -0b1", line)
-                line = re.sub(AUTOFUNC_USR_PATTERN, r";\\func -0b10", line)
+                line = re.sub(AUTOFUNC_PATTERN, r";\\func -0b1", line)
             if pseudo_ops:
                 line = re.sub(r"( *)(\\.*)", r"\1;\2", line)
             if macro:
