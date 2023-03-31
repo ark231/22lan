@@ -196,6 +196,8 @@ CPlusPlusGenerator{{
                 self.functions[-1].add_step("if(r1 == 0){")
                 if self.enable_gnu_extension:
                     self.functions[-1].add_step("    goto *ltable[r0];")
+                else:
+                    self.functions[-1].add_step(f"    {GOTO}")
                 self.functions[-1].add_step("}")
             elif instruction == "pushl8":
                 self._debug_comment_instruction(instruction)
@@ -253,12 +255,12 @@ CPlusPlusGenerator{{
 #include<iostream>
 #include<unordered_map>
 #include<stack>
+#include<functional>
 
 namespace lan22{
 std::uint64_t r0,r1,r2,r3;
 std::stack<std::uint8_t> s0,s1,s2;
-using Function=void(void);
-std::unordered_map<std::uint64_t,Function*> ftable;
+std::unordered_map<std::uint64_t,std::function<void(void)>> ftable;
         """.strip(
             "\n"
         ).rstrip(

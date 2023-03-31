@@ -88,7 +88,7 @@ class MacroResolver:
         result = common.Code()
         macro_found = False
         for line in code:
-            match = re.search(r"^(?P<indent> *)#(?P<name>[a-zA-Z0-9_]+)( +(?P<args>.+))?", line)
+            match = re.search(r"^(?P<indent> *)#(?P<name>[a-zA-Z0-9_]+)( +(?P<args>[^;]+))?", line)
             if match:
                 macro_found = True
                 args = []

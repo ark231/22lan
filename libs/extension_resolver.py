@@ -128,7 +128,7 @@ class ExtensionResolver:
 
         for line in self.code:
             operation_match = re.search(r"(?P<indent> *)(?P<op>[a-z0-9_]+)", line)
-            pseudo_match = re.search(r"^(?P<indent> *)\\(?P<pseudo_op>[a-zA-Z0-9_]+) +(?P<pseudo_arg>.+)", line)
+            pseudo_match = re.search(r"^(?P<indent> *)\\(?P<pseudo_op>[a-zA-Z0-9_]+) +(?P<pseudo_arg>[^;]+)", line)
             if operation_match is not None:
                 if operation_match["op"] == "startfunc":
                     self.labels[current_func_index] = {}
@@ -198,7 +198,7 @@ class ExtensionResolver:
         current_func_index = 1
         for line in self.code:
             operation_match = re.search(r"(?P<indent> *)(?P<op>[a-z0-9_]+)", line)
-            pseudo_match = re.search(r"(?P<indent> *)%(?P<pseudo_op>[a-zA-Z0-9_]+) +(?P<pseudo_arg>.+)", line)
+            pseudo_match = re.search(r"(?P<indent> *)%(?P<pseudo_op>[a-zA-Z0-9_]+) +(?P<pseudo_arg>[^;]+)", line)
             if operation_match is not None:
                 if operation_match["op"] == "endfunc":
                     current_func_index += 1
@@ -287,8 +287,8 @@ class ExtensionResolver:
     def resolve_literal(self) -> None:
         result = common.Code()
         for line in self.code:
-            VALUE_PATTERN = r"(?P<number>[-+xob_0-9]+)(:(?P<bitwidth>[0-9]+))?"
-            literal_match = re.search(rf"(?P<indent> *)\${{{VALUE_PATTERN}}}", line)
+            VALUE_PATTERN = r"(?P<number>[-+xob_0-9]+)( *: *(?P<bitwidth>[0-9]+))?"
+            literal_match = re.search(rf"(?P<indent> *)\${{ *{VALUE_PATTERN} *}}", line)
             if literal_match is None:
                 result.add_line(line)
                 continue
